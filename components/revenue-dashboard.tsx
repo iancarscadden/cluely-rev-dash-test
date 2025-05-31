@@ -5,10 +5,20 @@ import { Settings, RefreshCw, AlertCircle } from "lucide-react"
 import { RevenueChart } from "./revenue-chart"
 import { CountUp } from "./count-up"
 import { SettingsPanel } from "./settings-panel"
-import GeographicalGlobe from "./geographical-globe"
 import { formatCurrency } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { format, parseISO, isValid } from "date-fns"
+import dynamic from "next/dynamic"
+
+// Dynamically import GeographicalGlobe with SSR disabled
+const GeographicalGlobe = dynamic(() => import("./geographical-globe"), {
+  ssr: false, // This prevents server-side rendering
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white opacity-50"></div>
+    </div>
+  ),
+})
 
 // Types for our revenue data
 interface RevenueData {
