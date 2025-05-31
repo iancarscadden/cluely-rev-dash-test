@@ -145,96 +145,188 @@ export function RevenueChart({ data, splitRevenue, showARR }: RevenueChartProps)
   }
 
   return (
-    <div className="w-full h-full bg-gradient-to-br from-blue-50 to-indigo-100 rounded-lg p-4">
+    <div className="w-full h-full bg-transparent rounded-lg relative">
+      {/* Custom CSS for enhanced visual effects */}
+      <style jsx>{`
+        .recharts-cartesian-grid-horizontal line,
+        .recharts-cartesian-grid-vertical line {
+          stroke: rgba(255, 255, 255, 0.1);
+          stroke-width: 1;
+        }
+        
+        .recharts-cartesian-axis-line {
+          stroke: rgba(255, 255, 255, 0.3);
+          stroke-width: 2;
+        }
+        
+        .chart-glow {
+          filter: drop-shadow(0 0 8px rgba(96, 165, 250, 0.3));
+        }
+        
+        .line-glow {
+          filter: drop-shadow(0 0 6px currentColor);
+        }
+      `}</style>
+      
       <ResponsiveContainer width="100%" height="100%">
         {splitRevenue ? (
-          <LineChart data={chartData} margin={{ top: 30, right: 30, left: 20, bottom: 30 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
+          <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 40 }}>
+            {/* Enhanced grid with subtle glow */}
+            <CartesianGrid 
+              strokeDasharray="3 3" 
+              stroke="rgba(255,255,255,0.08)" 
+              strokeWidth={1}
+              className="opacity-60"
+            />
+            
+            {/* Stylized X-axis */}
             <XAxis
               dataKey="date"
-              tick={{ fontSize: 20, fill: "#374151" }}
-              stroke="#9CA3AF"
+              tick={{ 
+                fontSize: 14, 
+                fill: "#ffffff", 
+                fontWeight: "bold"
+              }}
+              stroke="rgba(255,255,255,0.4)"
+              strokeWidth={2}
               ticks={monthTicks}
-              axisLine={{ stroke: "#9CA3AF" }}
-              tickLine={{ stroke: "#9CA3AF" }}
-              // Use type="category" to ensure even spacing
+              axisLine={{ stroke: "rgba(255,255,255,0.4)", strokeWidth: 2 }}
+              tickLine={{ stroke: "rgba(255,255,255,0.4)", strokeWidth: 2 }}
               type="category"
-              // Ensure all ticks are shown
               interval={0}
             />
+            
+            {/* Stylized Y-axis */}
             <YAxis
               tickFormatter={(value) => formatTooltip(value)}
-              tick={{ fontSize: 20, fill: "#374151" }}
-              stroke="#9CA3AF"
-              width={120}
-              axisLine={{ stroke: "#9CA3AF" }}
-              tickLine={{ stroke: "#9CA3AF" }}
-            />
-            <Tooltip content={<CustomTooltip />} />
-            <Legend
-              wrapperStyle={{ paddingTop: 20 }}
-              formatter={(value) => <span className="text-gray-700 text-lg">{value}</span>}
+              tick={{ 
+                fontSize: 14, 
+                fill: "#ffffff", 
+                fontWeight: "bold"
+              }}
+              stroke="rgba(255,255,255,0.4)"
+              strokeWidth={2}
+              width={100}
+              axisLine={{ stroke: "rgba(255,255,255,0.4)", strokeWidth: 2 }}
+              tickLine={{ stroke: "rgba(255,255,255,0.4)", strokeWidth: 2 }}
             />
 
+            {/* Enhanced Cluely line with glow effect */}
             <Line
               type="monotone"
               dataKey="cumulative_amount_cluely"
               name="Cluely Revenue"
-              stroke="#3B82F6"
-              strokeWidth={5}
+              stroke="#60A5FA"
+              strokeWidth={4}
               dot={false}
-              activeDot={{ r: 8, strokeWidth: 2, fill: "#3B82F6" }}
+              activeDot={{ 
+                r: 8, 
+                strokeWidth: 3, 
+                fill: "#60A5FA",
+                stroke: "#ffffff",
+                filter: "drop-shadow(0 0 8px #60A5FA)"
+              }}
+              className="line-glow"
+              animationDuration={2000}
             />
+            
+            {/* Enhanced Interview Coder line with glow effect */}
             <Line
               type="monotone"
               dataKey="cumulative_amount_interview_coder"
               name="Interview Coder Revenue"
-              stroke="#F59E0B"
-              strokeWidth={5}
+              stroke="#FBBF24"
+              strokeWidth={4}
               dot={false}
-              activeDot={{ r: 8, strokeWidth: 2, fill: "#F59E0B" }}
+              activeDot={{ 
+                r: 8, 
+                strokeWidth: 3, 
+                fill: "#FBBF24",
+                stroke: "#ffffff",
+                filter: "drop-shadow(0 0 8px #FBBF24)"
+              }}
+              className="line-glow"
+              animationDuration={2000}
             />
           </LineChart>
         ) : (
-          <AreaChart data={chartData} margin={{ top: 30, right: 30, left: 20, bottom: 30 }}>
+          <AreaChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 40 }}>
+            {/* Enhanced gradient definitions */}
             <defs>
               <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8} />
-                <stop offset="95%" stopColor="#3B82F6" stopOpacity={0.1} />
+                <stop offset="5%" stopColor="#60A5FA" stopOpacity={0.9} />
+                <stop offset="25%" stopColor="#60A5FA" stopOpacity={0.6} />
+                <stop offset="50%" stopColor="#60A5FA" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="#60A5FA" stopOpacity={0.05} />
+              </linearGradient>
+              
+              {/* Glowing border gradient */}
+              <linearGradient id="glowBorder" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#ffffff" stopOpacity={0.8} />
+                <stop offset="50%" stopColor="#60A5FA" stopOpacity={0.9} />
+                <stop offset="100%" stopColor="#3B82F6" stopOpacity={0.7} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
+            
+            {/* Enhanced grid */}
+            <CartesianGrid 
+              strokeDasharray="3 3" 
+              stroke="rgba(255,255,255,0.08)" 
+              strokeWidth={1}
+              className="opacity-60"
+            />
+            
+            {/* Stylized X-axis */}
             <XAxis
               dataKey="date"
-              tick={{ fontSize: 20, fill: "#374151" }}
-              stroke="#9CA3AF"
+              tick={{ 
+                fontSize: 14, 
+                fill: "#ffffff", 
+                fontWeight: "bold"
+              }}
+              stroke="rgba(255,255,255,0.4)"
+              strokeWidth={2}
               ticks={monthTicks}
-              axisLine={{ stroke: "#9CA3AF" }}
-              tickLine={{ stroke: "#9CA3AF" }}
-              // Use type="category" to ensure even spacing
+              axisLine={{ stroke: "rgba(255,255,255,0.4)", strokeWidth: 2 }}
+              tickLine={{ stroke: "rgba(255,255,255,0.4)", strokeWidth: 2 }}
               type="category"
-              // Ensure all ticks are shown
               interval={0}
             />
+            
+            {/* Stylized Y-axis */}
             <YAxis
               tickFormatter={(value) => formatTooltip(value)}
-              tick={{ fontSize: 20, fill: "#374151" }}
-              stroke="#9CA3AF"
-              width={120}
-              axisLine={{ stroke: "#9CA3AF" }}
-              tickLine={{ stroke: "#9CA3AF" }}
+              tick={{ 
+                fontSize: 14, 
+                fill: "#ffffff", 
+                fontWeight: "bold"
+              }}
+              stroke="rgba(255,255,255,0.4)"
+              strokeWidth={2}
+              width={100}
+              axisLine={{ stroke: "rgba(255,255,255,0.4)", strokeWidth: 2 }}
+              tickLine={{ stroke: "rgba(255,255,255,0.4)", strokeWidth: 2 }}
             />
-            <Tooltip content={<CustomTooltip />} />
+            
+            {/* Enhanced area with dramatic gradient and glow */}
             <Area
               type="monotone"
               dataKey="total_cumulative_revenue"
               name="Total Revenue"
-              stroke="#3B82F6"
-              strokeWidth={5}
+              stroke="url(#glowBorder)"
+              strokeWidth={4}
               fillOpacity={1}
               fill="url(#colorRevenue)"
               dot={false}
-              activeDot={{ r: 8, strokeWidth: 2, fill: "#3B82F6" }}
+              activeDot={{ 
+                r: 8, 
+                strokeWidth: 3, 
+                fill: "#60A5FA",
+                stroke: "#ffffff",
+                filter: "drop-shadow(0 0 12px #60A5FA)"
+              }}
+              className="chart-glow"
+              animationDuration={2000}
             />
           </AreaChart>
         )}

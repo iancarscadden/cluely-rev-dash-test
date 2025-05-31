@@ -4,14 +4,18 @@ import { parse } from "csv-parse/sync"
 import fs from "fs"
 import path from "path"
 
+// Revenue adjustment configuration
+const REVENUE_ADJUSTMENT_ENABLED = false // Set to false to disable the adjustment
+const REVENUE_ADJUSTMENT_AMOUNT = 360000 // $360k flat adjustment
+
 // Initialize Stripe clients with timeout
 const interviewCoderStripe = new Stripe(process.env.STRIPE_INTERVIEW_CODER || "", {
-  apiVersion: "2023-10-16",
+  apiVersion: "2025-05-28.basil",
   timeout: 30000, // 30 second timeout
 })
 
 const cluelyStripe = new Stripe(process.env.STRIPE_CLUELY || "", {
-  apiVersion: "2023-10-16",
+  apiVersion: "2025-05-28.basil",
   timeout: 30000, // 30 second timeout
 })
 
@@ -203,21 +207,41 @@ export async function GET() {
       })
     }
 
-    // Get today's revenue or the last day's revenue
-    const lastEntry = combinedData[combinedData.length - 1]
+    // Get today's revenue with proper date filtering
+    const todayDateString = convertToPacificTime(Math.floor(Date.now() / 1000))
+    console.log(`API: Looking for today's revenue data for date: ${todayDateString}`)
 
-    // Prepare the response
+    // Find today's specific revenue entry
+    const todayEntry = combinedData.find(entry => entry.date === todayDateString)
+    
+    // If today's data isn't available yet, use the most recent entry
+    const lastEntry = combinedData[combinedData.length - 1]
+    const revenueEntry = todayEntry || lastEntry
+    
+    const usingTodayData = !!todayEntry
+    console.log(`API: Using ${usingTodayData ? 'today\'s' : 'most recent'} revenue data from date: ${revenueEntry.date}`)
+    
+    if (!usingTodayData) {
+      console.log(`API: Today's data (${todayDateString}) not available yet. Using most recent data from ${revenueEntry.date}`)
+    }
+
+    // Log revenue values for debugging
+    console.log(`API: Revenue values - Interview Coder: $${revenueEntry.amount_interview_coder}, Cluely: $${revenueEntry.amount_cluely}, Total: $${revenueEntry.total_daily_revenue}`)
+
+    // Prepare the response with better today_revenue handling
     const response = {
       revenue_data: combinedData,
       today_revenue: {
-        interview_coder: lastEntry.amount_interview_coder,
-        cluely: lastEntry.amount_cluely,
-        total: lastEntry.total_daily_revenue,
+        interview_coder: revenueEntry.amount_interview_coder,
+        cluely: revenueEntry.amount_cluely,
+        total: revenueEntry.total_daily_revenue,
+        date: revenueEntry.date, // Include the date for debugging
+        is_today: usingTodayData, // Flag to show if this is actually today's data
       },
       total_revenue: {
-        interview_coder: lastEntry.cumulative_amount_interview_coder,
-        cluely: lastEntry.cumulative_amount_cluely,
-        total: lastEntry.total_cumulative_revenue,
+        interview_coder: revenueEntry.cumulative_amount_interview_coder,
+        cluely: revenueEntry.cumulative_amount_cluely,
+        total: revenueEntry.total_cumulative_revenue,
       },
     }
 
@@ -232,6 +256,7 @@ export async function GET() {
   }
 }
 
+// REVERTED: Using the old working logic that only includes positive revenue
 async function getStripeRevenue(
   stripeClient: Stripe,
   startTimestamp: number,
@@ -248,13 +273,13 @@ async function getStripeRevenue(
 
   try {
     // Fetch all transactions using our helper function
-    const transactions = await fetchAllTransactions(stripeClient, startTimestamp, endTimestamp)
+    const transactions = await fetchAllTransactionsImproved(stripeClient, startTimestamp, endTimestamp)
 
-    // Process transactions and aggregate by date
+    // Process transactions and aggregate by date using OLD working logic
     for (const transaction of transactions) {
-      // Only include positive revenue transactions
+      // Only include positive revenue transactions (OLD LOGIC)
       if (transaction.amount > 0 && (transaction.type === "charge" || transaction.type === "payment")) {
-        // Convert UTC timestamp to Pacific Time date string
+        // Convert UTC timestamp to Pacific Time date string (using 'created' not 'available_on')
         const date = convertToPacificTime(transaction.created)
 
         // Handle currency conversion properly
@@ -284,12 +309,12 @@ async function getStripeRevenue(
   }
 }
 
-// Helper function to fetch all transactions with pagination
-async function fetchAllTransactions(
+// IMPROVED: Helper function to fetch all transactions with better filtering
+async function fetchAllTransactionsImproved(
   stripeClient: Stripe,
   startTimestamp: number,
   endTimestamp?: number,
-  maxPages = 10, // Limit the number of pages to avoid excessive API calls
+  maxPages = 20, // Increased from 10 for more comprehensive data
 ): Promise<Stripe.BalanceTransaction[]> {
   // Initialize an array to store all transactions
   const allTransactions: Stripe.BalanceTransaction[] = []
@@ -298,12 +323,11 @@ async function fetchAllTransactions(
   const params: Stripe.BalanceTransactionListParams = {
     created: {
       gte: startTimestamp,
+      ...(endTimestamp && { lte: endTimestamp }),
     },
     limit: 100, // Maximum allowed by Stripe
-  }
-
-  if (endTimestamp) {
-    params.created.lte = endTimestamp
+    // Use expand to get more transaction details
+    expand: ["data.source"],
   }
 
   let hasMore = true
@@ -323,7 +347,7 @@ async function fetchAllTransactions(
       // Fetch a page of transactions with timeout handling
       const transactions = (await Promise.race([
         stripeClient.balanceTransactions.list(params),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Stripe API request timed out")), 15000)),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Stripe API request timed out")), 20000)), // Increased timeout
       ])) as Stripe.ApiList<Stripe.BalanceTransaction>
 
       // Add transactions to our collection

@@ -5,10 +5,9 @@ import { Settings, RefreshCw, AlertCircle } from "lucide-react"
 import { RevenueChart } from "./revenue-chart"
 import { CountUp } from "./count-up"
 import { SettingsPanel } from "./settings-panel"
+import GeographicalGlobe from "./geographical-globe"
 import { formatCurrency } from "@/lib/utils"
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Skeleton } from "@/components/ui/skeleton"
 import { format, parseISO, isValid } from "date-fns"
 
 // Types for our revenue data
@@ -28,6 +27,8 @@ interface RevenueResponse {
     interview_coder: number
     cluely: number
     total: number
+    date?: string // Date of the revenue data
+    is_today?: boolean // Whether this is actually today's data
   }
   total_revenue: {
     interview_coder: number
@@ -72,6 +73,7 @@ function safeFormatDate(dateString: string, formatStr: string): string {
 export default function RevenueDashboard() {
   // State for revenue data
   const [revenueData, setRevenueData] = useState<RevenueResponse | null>(null)
+  const [geographicalData, setGeographicalData] = useState<any>(null)
   const [initialLoading, setInitialLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -104,33 +106,52 @@ export default function RevenueDashboard() {
         }
       }
 
-      // Add a timeout to the fetch to prevent hanging
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+      // Fetch both revenue and geographical data in parallel
+      const [revenueResponse, geographicalResponse] = await Promise.all([
+        // Revenue data
+        fetch("/api/revenue", {
+          cache: "no-store",
+        }),
+        // Geographical data
+        fetch("/api/geographical", {
+          cache: "no-store",
+        })
+      ])
 
-      const response = await fetch("/api/revenue", {
-        signal: controller.signal,
-        cache: "no-store", // Ensure we don't get cached responses
-      })
-
-      clearTimeout(timeoutId)
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+      if (!revenueResponse.ok) {
+        throw new Error(`Revenue API error! status: ${revenueResponse.status}`)
       }
 
-      const newData = await response.json()
+      const newRevenueData = await revenueResponse.json()
+      console.log("Dashboard: Revenue data received", newRevenueData)
 
-      console.log("Dashboard: Revenue data received", newData)
-
-      if (newData.error) {
-        console.error(`Dashboard: Error from Revenue API - ${newData.error}`)
-        setError(newData.error)
+      if (newRevenueData.error) {
+        console.error(`Dashboard: Error from Revenue API - ${newRevenueData.error}`)
+        setError(newRevenueData.error)
       } else {
-        setRevenueData(newData)
+        setRevenueData(newRevenueData)
         setError(null)
         console.log("Dashboard: Revenue data updated successfully")
       }
+
+      // Handle geographical data (don't fail if this errors)
+      if (geographicalResponse.ok) {
+        const newGeographicalData = await geographicalResponse.json()
+        console.log("Dashboard: Geographical data received", newGeographicalData)
+        
+        if (!newGeographicalData.error) {
+          setGeographicalData(newGeographicalData)
+          console.log("Dashboard: Geographical data updated successfully")
+          console.log("Dashboard: Combined geographical data points:", newGeographicalData.geographical_data?.combined?.length || 0)
+        } else {
+          console.warn("Dashboard: Geographical data error:", newGeographicalData.error)
+        }
+      } else {
+        console.warn("Dashboard: Geographical API failed, using mock data")
+        console.warn("Dashboard: Response status:", geographicalResponse.status)
+        console.warn("Dashboard: Response statusText:", geographicalResponse.statusText)
+      }
+
     } catch (err) {
       console.error("Dashboard: Failed to fetch revenue data", err)
       setError(`Failed to fetch revenue data: ${err instanceof Error ? err.message : String(err)}`)
@@ -216,24 +237,8 @@ export default function RevenueDashboard() {
       : revenueData.today_revenue.total
   }
 
-  // Get the latest date from the revenue data
-  const getLatestDate = () => {
-    if (!revenueData || !revenueData.revenue_data || revenueData.revenue_data.length === 0) {
-      return "Latest"
-    }
-
-    try {
-      const latestEntry = revenueData.revenue_data[revenueData.revenue_data.length - 1]
-      // Safely format the date
-      return safeFormatDate(latestEntry.date, "MMM d")
-    } catch (error) {
-      console.error("Error getting latest date:", error)
-      return "Latest"
-    }
-  }
-
   return (
-    <div className="flex flex-col h-full">
+    <div className="w-screen h-screen bg-black relative overflow-hidden">
       {/* Settings panel */}
       {showSettings && (
         <SettingsPanel
@@ -243,167 +248,172 @@ export default function RevenueDashboard() {
         />
       )}
 
-      {/* Header with revenue display and controls */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center mb-6">
-        {/* Total Revenue */}
-        <Card className="md:col-span-6 bg-white border-gray-200 shadow-md h-auto">
-          <CardContent className="p-8">
-            <div className="flex flex-col">
-              <span className="text-2xl font-medium text-blue-600 mb-2">Total Revenue</span>
-
-              {initialLoading ? (
-                <Skeleton className="h-24 w-80 bg-gray-200" />
-              ) : error && !revenueData ? (
-                <div className="text-red-600 text-xl flex items-center gap-2">
-                  <AlertCircle className="h-6 w-6" />
-                  <span>Error loading data</span>
-                </div>
-              ) : splitRevenue ? (
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
-                      <p className="text-2xl font-medium text-gray-700">Cluely</p>
-                    </div>
-                    <CountUp
-                      value={getDisplayValue().cluely}
-                      prevValue={getPrevValue().cluely}
-                      className="text-8xl font-bold font-inter tracking-tight text-gray-900"
-                      duration={2000} // Longer duration for smoother animation
-                    />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 bg-yellow-500 rounded-full"></div>
-                      <p className="text-2xl font-medium text-gray-700">Interview Coder</p>
-                    </div>
-                    <CountUp
-                      value={getDisplayValue().interviewCoder}
-                      prevValue={getPrevValue().interviewCoder}
-                      className="text-8xl font-bold font-inter tracking-tight text-gray-900"
-                      duration={2000} // Longer duration for smoother animation
-                    />
-                  </div>
-                </div>
-              ) : (
-                <CountUp
-                  value={getDisplayValue()}
-                  prevValue={getPrevValue()}
-                  className="text-9xl font-bold font-inter tracking-tight text-gray-900"
-                  duration={2000} // Longer duration for smoother animation
-                />
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Today's Revenue */}
-        <Card className="md:col-span-4 bg-white border-gray-200 shadow-md h-auto">
-          <CardContent className="p-8">
-            <div className="flex flex-col">
-              <span className="text-2xl font-medium text-indigo-600 mb-2">Today's Revenue</span>
-
-              {initialLoading ? (
-                <Skeleton className="h-16 w-64 bg-gray-200" />
-              ) : error && !revenueData ? (
-                <div className="text-red-600 text-xl flex items-center gap-2">
-                  <AlertCircle className="h-6 w-6" />
-                  <span>Error loading data</span>
-                </div>
-              ) : splitRevenue ? (
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-xl font-medium text-gray-600">Cluely</p>
-                    <p className="text-6xl font-bold font-inter tracking-tight text-gray-900">
-                      {formatCurrency(getTodayRevenue().cluely)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xl font-medium text-gray-600">Interview Coder</p>
-                    <p className="text-6xl font-bold font-inter tracking-tight text-gray-900">
-                      {formatCurrency(getTodayRevenue().interviewCoder)}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-7xl font-bold font-inter tracking-tight text-gray-900">
-                  {formatCurrency(getTodayRevenue())}
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Controls */}
-        <div className="md:col-span-2 flex justify-end gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="h-12 w-12 rounded-full bg-white border-gray-300 hover:bg-gray-100 hover:border-gray-400"
-            aria-label="Refresh data"
-          >
-            <RefreshCw className={`h-6 w-6 text-gray-700 ${refreshing ? "animate-spin" : ""}`} />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={toggleSettings}
-            className="h-12 w-12 rounded-full bg-white border-gray-300 hover:bg-gray-100 hover:border-gray-400"
-            aria-label="Settings"
-          >
-            <Settings className="h-6 w-6 text-gray-700" />
-          </Button>
-        </div>
+      {/* Full-screen Globe Background */}
+      <div className="absolute inset-0 w-full h-full">
+        <GeographicalGlobe 
+          className="w-full h-full relative z-10" 
+          todaysRevenue={typeof getTodayRevenue() === 'number' ? getTodayRevenue() as number : 0}
+          data={geographicalData?.geographical_data?.combined || undefined}
+        />
       </div>
 
-      {/* Chart Card - Make it fill the remaining space */}
-      <Card className="border-gray-200 shadow-lg overflow-hidden bg-white flex-grow">
-        <CardContent className="p-0 h-full">
-          {initialLoading ? (
-            <div className="h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-              <div className="flex flex-col items-center gap-4">
-                <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div>
-                <p className="text-xl text-gray-700">Loading historical data...</p>
+      {/* Centered Chart Layout */}
+      <div className="absolute inset-0 z-10 flex flex-col justify-start pt-8">
+        <div className="w-full max-w-6xl mx-auto px-8">
+          
+          {/* Revenue Metrics Row - Above Chart - Moved up and aligned */}
+          <div className="flex items-center justify-between gap-8 mb-6">
+            
+            {/* Total Revenue - Left - Same size as Today's */}
+            <div className="flex-1">
+              <div className="bg-black bg-opacity-40 backdrop-blur-sm rounded-xl p-8 border border-white border-opacity-20 relative overflow-hidden">
+                {/* Cluely Logo in top right corner of revenue box */}
+                <div className="absolute top-4 right-4 pointer-events-none opacity-20">
+                  <svg 
+                    className="w-16 h-16 text-white"
+                    viewBox="0 0 64.37 64.41" 
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <g>
+                      <path 
+                        className="fill-current" 
+                        d="M42.81,1.81C17.56-6.81-6.47,16.8,1.58,42.22c7.4,23.37,38.16,29.95,54.52,11.65,15.33-17.14,8.47-44.63-13.29-52.06ZM8.41,25.04c5.36,4.43,12.1,6.67,19.07,6.57l-15.39,15.28c-4.52-6.29-5.93-14.4-3.68-21.85ZM39.17,56.12c-7.39,2.12-15.45.71-21.64-3.8l15.48-15.59c-.25,2.3.05,4.89.51,7.19.46,2.27,1.4,4.91,2.46,6.97.9,1.75,2.24,3.22,3.19,4.82.11.19.34.14,0,.41ZM52.05,47.26c-.75,1-4.45,5.03-5.45,5.23-.61.13-2-1.71-2.39-2.24-6.37-8.74-4.83-20.87,3.15-28,.05-.19-.1-.27-.18-.39-.33-.49-4.12-4.28-4.62-4.62-.22-.15-.22-.26-.52-.11-.49.26-1.75,1.86-2.37,2.37-7.94,6.65-20.62,6.25-27.75-1.36,3.6-5.98,11.06-10.08,17.98-10.67,21.49-1.84,35.18,22.53,22.15,39.79Z"
+                      />
+                    </g>
+                  </svg>
+                </div>
+                
+                <h2 className="text-3xl font-semibold text-white mb-6">Total Revenue</h2>
+
+                {initialLoading ? (
+                  <div className="h-20 w-80 bg-white bg-opacity-20 rounded animate-pulse" />
+                ) : error && !revenueData ? (
+                  <div className="text-red-400 text-xl flex items-center gap-2">
+                    <AlertCircle className="h-6 w-6" />
+                    <span>Error loading data</span>
+                  </div>
+                ) : splitRevenue ? (
+                  <div className="space-y-6">
+                    <div>
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-4 h-4 bg-blue-400 rounded-full"></div>
+                        <p className="text-xl text-white opacity-80">Cluely</p>
+                      </div>
+                      <CountUp
+                        value={splitRevenue && typeof getDisplayValue() === 'object' ? (getDisplayValue() as any).cluely : 0}
+                        prevValue={splitRevenue && typeof getPrevValue() === 'object' ? (getPrevValue() as any).cluely : 0}
+                        className="text-5xl font-bold text-white"
+                        duration={2000}
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-4 h-4 bg-yellow-400 rounded-full"></div>
+                        <p className="text-xl text-white opacity-80">Interview Coder</p>
+                      </div>
+                      <CountUp
+                        value={splitRevenue && typeof getDisplayValue() === 'object' ? (getDisplayValue() as any).interviewCoder : 0}
+                        prevValue={splitRevenue && typeof getPrevValue() === 'object' ? (getPrevValue() as any).interviewCoder : 0}
+                        className="text-5xl font-bold text-white"
+                        duration={2000}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <CountUp
+                    value={!splitRevenue && typeof getDisplayValue() === 'number' ? getDisplayValue() as number : 0}
+                    prevValue={!splitRevenue && typeof getPrevValue() === 'number' ? getPrevValue() as number : 0}
+                    className="text-7xl font-bold text-white"
+                    duration={2000}
+                  />
+                )}
               </div>
             </div>
-          ) : error && !revenueData ? (
-            <div className="h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-              <div className="text-red-600 text-center p-6 flex flex-col items-center gap-4">
-                <AlertCircle className="h-12 w-12" />
-                <p className="text-xl">Error loading chart data</p>
-                <Button
-                  variant="outline"
-                  onClick={handleRefresh}
-                  className="mt-2 bg-white border-gray-300 hover:bg-gray-100 text-gray-700 text-lg px-6 py-3"
-                >
-                  Try Again
-                </Button>
+
+            {/* Today's Revenue - Right - Same size as Total */}
+            <div className="flex-1">
+              <div className="bg-black bg-opacity-40 backdrop-blur-sm rounded-xl p-8 border border-white border-opacity-20">
+                <h2 className="text-3xl font-semibold text-white mb-6">Today's Revenue</h2>
+
+                {initialLoading ? (
+                  <div className="h-20 w-80 bg-white bg-opacity-20 rounded animate-pulse" />
+                ) : error && !revenueData ? (
+                  <div className="text-red-400 text-xl flex items-center gap-2">
+                    <AlertCircle className="h-6 w-6" />
+                    <span>Error loading data</span>
+                  </div>
+                ) : splitRevenue ? (
+                  <div className="space-y-6">
+                    <div>
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-4 h-4 bg-blue-400 rounded-full"></div>
+                        <p className="text-xl text-white opacity-80">Cluely</p>
+                      </div>
+                      <p className="text-5xl font-bold text-white">
+                        {formatCurrency(splitRevenue && typeof getTodayRevenue() === 'object' ? (getTodayRevenue() as any).cluely : 0)}
+                      </p>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-4 h-4 bg-yellow-400 rounded-full"></div>
+                        <p className="text-xl text-white opacity-80">Interview Coder</p>
+                      </div>
+                      <p className="text-5xl font-bold text-white">
+                        {formatCurrency(splitRevenue && typeof getTodayRevenue() === 'object' ? (getTodayRevenue() as any).interviewCoder : 0)}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-7xl font-bold text-white">
+                    {formatCurrency(!splitRevenue && typeof getTodayRevenue() === 'number' ? getTodayRevenue() as number : 0)}
+                  </p>
+                )}
               </div>
             </div>
-          ) : (
-            <div className="h-full relative">
-              {revenueData && revenueData.revenue_data && revenueData.revenue_data.length > 0 ? (
-                <>
-                  <RevenueChart data={revenueData.revenue_data} splitRevenue={splitRevenue} showARR={false} />
-                  {refreshing && (
-                    <div className="absolute top-4 right-4 bg-white bg-opacity-70 rounded-full p-2">
-                      <RefreshCw className="h-6 w-6 text-blue-600 animate-spin" />
+          </div>
+
+          {/* Large Chart - Extended to bottom */}
+          <div className="w-full" style={{ height: 'calc(100vh - 280px)' }}>
+            <div className="bg-black bg-opacity-40 backdrop-blur-sm rounded-xl p-6 border border-white border-opacity-20 h-full">
+              {initialLoading ? (
+                <div className="h-full flex items-center justify-center">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-white"></div>
+                    <p className="text-sm text-white opacity-80">Loading chart...</p>
+                  </div>
+                </div>
+              ) : error && !revenueData ? (
+                <div className="h-full flex items-center justify-center">
+                  <div className="text-red-400 text-center flex flex-col items-center gap-3">
+                    <AlertCircle className="h-8 w-8" />
+                    <p className="text-sm">Chart error</p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRefresh}
+                      className="text-white hover:bg-white hover:bg-opacity-20"
+                    >
+                      Retry
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-full relative">
+                  {revenueData && revenueData.revenue_data && revenueData.revenue_data.length > 0 ? (
+                    <>
+                      <RevenueChart data={revenueData.revenue_data} splitRevenue={splitRevenue} showARR={false} />
+                    </>
+                  ) : (
+                    <div className="h-full flex items-center justify-center">
+                      <p className="text-white opacity-80">No chart data available</p>
                     </div>
                   )}
-                </>
-              ) : (
-                <div className="h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-                  <div className="text-gray-700 text-center p-6">
-                    <p className="text-xl">No historical data available</p>
-                  </div>
                 </div>
               )}
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
