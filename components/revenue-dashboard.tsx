@@ -100,8 +100,40 @@ export default function RevenueDashboard() {
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const autoRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Function to fetch revenue data
+  // Function to fetch revenue data with retry logic
   const fetchRevenueData = async (isInitialLoad = false) => {
+    const maxRetries = 5 // Increased from 3 to 5
+    const retryDelay = 3000 // Increased from 2000 to 3000ms
+    const timeoutDuration = 15000 // Increased from 10000 to 15000ms
+
+    const fetchWithRetry = async (
+      url: string,
+      retryCount = 0
+    ): Promise<Response> => {
+      try {
+        const response = await fetch(url, {
+          cache: "no-store",
+          // Add timeout
+          signal: AbortSignal.timeout(timeoutDuration)
+        })
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+
+        return response
+      } catch (error) {
+        if (retryCount < maxRetries) {
+          console.log(`Dashboard: Retry attempt ${retryCount + 1} for ${url}`)
+          // Exponential backoff
+          const delay = retryDelay * Math.pow(1.5, retryCount)
+          await new Promise((resolve) => setTimeout(resolve, delay))
+          return fetchWithRetry(url, retryCount + 1)
+        }
+        throw error
+      }
+    }
+
     try {
       console.log(
         `Dashboard: ${
@@ -125,39 +157,40 @@ export default function RevenueDashboard() {
         }
       }
 
-      // Fetch both revenue and geographical data in parallel
-      const [revenueResponse, geographicalResponse] = await Promise.all([
+      // Fetch both revenue and geographical data in parallel with retry logic
+      const [revenueResponse, geographicalResponse] = await Promise.allSettled([
         // Revenue data
-        fetch("/api/revenue", {
-          cache: "no-store"
-        }),
+        fetchWithRetry("/api/revenue"),
         // Geographical data
-        fetch("/api/geographical", {
-          cache: "no-store"
-        })
+        fetchWithRetry("/api/geographical")
       ])
 
-      if (!revenueResponse.ok) {
-        throw new Error(`Revenue API error! status: ${revenueResponse.status}`)
-      }
+      // Handle revenue data response
+      if (revenueResponse.status === "fulfilled") {
+        const newRevenueData = await revenueResponse.value.json()
+        console.log("Dashboard: Revenue data received", newRevenueData)
 
-      const newRevenueData = await revenueResponse.json()
-      console.log("Dashboard: Revenue data received", newRevenueData)
-
-      if (newRevenueData.error) {
-        console.error(
-          `Dashboard: Error from Revenue API - ${newRevenueData.error}`
-        )
-        setError(newRevenueData.error)
+        if (newRevenueData.error) {
+          console.error(
+            `Dashboard: Error from Revenue API - ${newRevenueData.error}`
+          )
+          setError(newRevenueData.error)
+        } else {
+          setRevenueData(newRevenueData)
+          setError(null)
+          console.log("Dashboard: Revenue data updated successfully")
+        }
       } else {
-        setRevenueData(newRevenueData)
-        setError(null)
-        console.log("Dashboard: Revenue data updated successfully")
+        console.error(
+          "Dashboard: Failed to fetch revenue data",
+          revenueResponse.reason
+        )
+        setError(`Failed to fetch revenue data: ${revenueResponse.reason}`)
       }
 
-      // Handle geographical data (don't fail if this errors)
-      if (geographicalResponse.ok) {
-        const newGeographicalData = await geographicalResponse.json()
+      // Handle geographical data response
+      if (geographicalResponse.status === "fulfilled") {
+        const newGeographicalData = await geographicalResponse.value.json()
         console.log(
           "Dashboard: Geographical data received",
           newGeographicalData
@@ -178,11 +211,7 @@ export default function RevenueDashboard() {
         }
       } else {
         console.warn("Dashboard: Geographical API failed, using mock data")
-        console.warn("Dashboard: Response status:", geographicalResponse.status)
-        console.warn(
-          "Dashboard: Response statusText:",
-          geographicalResponse.statusText
-        )
+        console.warn("Dashboard: Response error:", geographicalResponse.reason)
       }
     } catch (err) {
       console.error("Dashboard: Failed to fetch revenue data", err)
