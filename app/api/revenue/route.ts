@@ -47,26 +47,43 @@ interface CSVRecord {
 
 // Helper function to convert UTC timestamp to Pacific Time date string (YYYY-MM-DD)
 function convertToPacificTime(timestamp: number): string {
-  // Create a date object from the timestamp (in milliseconds)
-  const date = new Date(timestamp * 1000)
+  try {
+    // Create a date object from the timestamp (in milliseconds)
+    const date = new Date(timestamp * 1000)
 
-  // Format the date in Pacific Time
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    timeZone: "America/Los_Angeles",
-  })
-    .format(date)
-    .split("/")
-    .map((part, index) => {
-      // Convert MM/DD/YYYY to YYYY-MM-DD
-      if (index === 0) return part.padStart(2, "0") // month
-      if (index === 1) return part.padStart(2, "0") // day
-      return part // year
-    })
-    .reverse()
-    .join("-")
+    // Validate the date object
+    if (isNaN(date.getTime())) {
+      console.error(`Invalid timestamp: ${timestamp}`)
+      return new Date().toISOString().slice(0, 10) // Fallback to today in ISO format
+    }
+
+    // Format the date in Pacific Time and construct YYYY-MM-DD properly
+    const formatted = new Intl.DateTimeFormat("en-US", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      timeZone: "America/Los_Angeles",
+    }).format(date)
+    
+    // Split MM/DD/YYYY and reconstruct as YYYY-MM-DD
+    const parts = formatted.split("/")
+    const month = parts[0].padStart(2, "0")
+    const day = parts[1].padStart(2, "0") 
+    const year = parts[2]
+    
+    const result = `${year}-${month}-${day}`
+    
+    // Validate the result format
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(result)) {
+      console.error(`Invalid date format generated: ${result} from timestamp: ${timestamp}`)
+      return new Date().toISOString().slice(0, 10) // Fallback to today in ISO format
+    }
+    
+    return result
+  } catch (error) {
+    console.error(`Error converting timestamp ${timestamp} to Pacific time:`, error)
+    return new Date().toISOString().slice(0, 10) // Fallback to today in ISO format
+  }
 }
 
 export async function GET() {
@@ -220,7 +237,9 @@ export async function GET() {
     }
 
     // Get today's revenue with proper date filtering
-    const todayDateString = convertToPacificTime(Math.floor(Date.now() / 1000))
+    const currentTimestamp = Math.floor(Date.now() / 1000)
+    const todayDateString = convertToPacificTime(currentTimestamp)
+    console.log(`API: Current timestamp: ${currentTimestamp}, Current date object: ${new Date()}, Converted Pacific date: ${todayDateString}`)
     console.log(`API: Looking for today's revenue data for date: ${todayDateString}`)
 
     // Find today's specific revenue entry
@@ -334,7 +353,7 @@ async function fetchAllTransactionsImproved(
   stripeClient: Stripe,
   startTimestamp: number,
   endTimestamp?: number,
-  maxPages = 8, // Reduced from 15 to 8 since we now only fetch ~7 days of recent data
+  maxPages = 20, // Increased from 8 to 20 to ensure we capture all recent transactions (only ~7 days)
 ): Promise<Stripe.BalanceTransaction[]> {
   // Initialize an array to store all transactions
   const allTransactions: Stripe.BalanceTransaction[] = []
