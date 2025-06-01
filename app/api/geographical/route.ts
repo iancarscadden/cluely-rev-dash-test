@@ -2,15 +2,15 @@ import { NextResponse } from "next/server"
 import Stripe from "stripe"
 import countries from "world-countries"
 
-// Initialize Stripe clients with timeout
+// Initialize Stripe clients with timeout - OPTIMIZED for Vercel (geographical data is less critical)
 const interviewCoderStripe = new Stripe(process.env.STRIPE_INTERVIEW_CODER || "", {
   apiVersion: "2025-05-28.basil",
-  timeout: 30000,
+  timeout: 10000, // Reduced to 10s since geographical data is less critical
 })
 
 const cluelyStripe = new Stripe(process.env.STRIPE_CLUELY || "", {
   apiVersion: "2025-05-28.basil", 
-  timeout: 30000,
+  timeout: 10000, // Reduced to 10s since geographical data is less critical
 })
 
 interface GeographicalRevenueData {
@@ -68,27 +68,27 @@ function getCountryCoordinates(countryCode: string): [number, number] | null {
   return COUNTRY_COORDINATES[code] || null
     }
     
-// Simplified approach to get geographical data from Stripe without problematic permissions
+// Simplified approach to get geographical data from Stripe without problematic permissions - OPTIMIZED for Vercel
 async function getGeographicalRevenue(stripeClient: Stripe, accountName: string): Promise<GeographicalRevenueData[]> {
   const locationData = new Map<string, { revenue: number; count: number }>()
   
   try {
     console.log(`${accountName}: Fetching geographical data...`)
   
-    // Get recent charges directly (this should work with basic permissions)
-    const thirtyDaysAgo = Math.floor((Date.now() - (30 * 24 * 60 * 60 * 1000)) / 1000)
+    // Get recent charges directly - REDUCED to 7 days for Vercel optimization (was 30 days)
+    const sevenDaysAgo = Math.floor((Date.now() - (7 * 24 * 60 * 60 * 1000)) / 1000)
     
     let allCharges: Stripe.Charge[] = []
     let hasMore = true
     let startingAfter: string | undefined = undefined
     let pageCount = 0
-    const maxPages = 10 // Limit to prevent timeouts
+    const maxPages = 3 // Reduced from 10 to 3 for Vercel optimization
     
     while (hasMore && pageCount < maxPages) {
       try {
         const chargesResponse: Stripe.Response<Stripe.ApiList<Stripe.Charge>> = await stripeClient.charges.list({
-      created: { gte: thirtyDaysAgo },
-      limit: 100,
+      created: { gte: sevenDaysAgo }, // Changed from thirtyDaysAgo to sevenDaysAgo
+      limit: 50, // Reduced from 100 to 50 for faster processing
           ...(startingAfter ? { starting_after: startingAfter } : {})
         })
         
@@ -104,9 +104,9 @@ async function getGeographicalRevenue(stripeClient: Stripe, accountName: string)
         pageCount++
         console.log(`${accountName}: Fetched page ${pageCount}, got ${chargesResponse.data.length} charges`)
         
-        // Small delay to avoid rate limits
+        // Small delay to avoid rate limits - reduced for faster processing
         if (hasMore) {
-          await new Promise(resolve => setTimeout(resolve, 100))
+          await new Promise(resolve => setTimeout(resolve, 50)) // Reduced from 100ms to 50ms
         }
       } catch (error) {
         console.error(`${accountName}: Error fetching charges page ${pageCount}:`, error)
@@ -242,47 +242,27 @@ async function getGeographicalRevenue(stripeClient: Stripe, accountName: string)
   }
 }
 
-// Create demo data for visualization
+// Create demo data for visualization - OPTIMIZED for Vercel
 function createDemoGeographicalData(): GeographicalRevenueData[] {
+  // Simplified demo data with fewer countries for faster processing
   const demoData = [
     { country: 'US', revenue: 15000, count: 45 },
     { country: 'GB', revenue: 8500, count: 25 },
     { country: 'CA', revenue: 6200, count: 18 },
     { country: 'AU', revenue: 4800, count: 14 },
     { country: 'DE', revenue: 5500, count: 16 },
-    { country: 'FR', revenue: 4200, count: 12 },
-    { country: 'JP', revenue: 3800, count: 11 },
-    { country: 'SG', revenue: 2200, count: 8 }
-  ]
+  ] // Reduced from 8 countries to 5 for faster processing
   
   const allPoints: GeographicalRevenueData[] = []
   
-  // Use the same improved intensity calculation as the main function
-  const allRevenues = demoData.map(d => d.revenue).sort((a, b) => b - a)
-  const maxRevenue = allRevenues[0] || 1
-  
-  // Define revenue thresholds for better color distribution
-  const highThreshold = maxRevenue * 0.7
-  const mediumHighThreshold = maxRevenue * 0.4
-  const mediumThreshold = maxRevenue * 0.2
-  const lowThreshold = maxRevenue * 0.05
+  // Simplified intensity calculation for demo data
+  const maxRevenue = Math.max(...demoData.map(d => d.revenue))
   
   demoData.forEach((data, index) => {
     const coordinates = getCountryCoordinates(data.country)
     if (coordinates) {
-      // Improved intensity calculation for better color distribution
-      let intensity: number
-      if (data.revenue >= highThreshold) {
-        intensity = 0.8 + (data.revenue - highThreshold) / (maxRevenue - highThreshold) * 0.2 // 0.8-1.0 (red)
-      } else if (data.revenue >= mediumHighThreshold) {
-        intensity = 0.6 + (data.revenue - mediumHighThreshold) / (highThreshold - mediumHighThreshold) * 0.2 // 0.6-0.8 (orange-red)
-      } else if (data.revenue >= mediumThreshold) {
-        intensity = 0.4 + (data.revenue - mediumThreshold) / (mediumHighThreshold - mediumThreshold) * 0.2 // 0.4-0.6 (orange)
-      } else if (data.revenue >= lowThreshold) {
-        intensity = 0.2 + (data.revenue - lowThreshold) / (mediumThreshold - lowThreshold) * 0.2 // 0.2-0.4 (yellow)
-      } else {
-        intensity = data.revenue / lowThreshold * 0.2 // 0.0-0.2 (green)
-      }
+      // Simplified intensity calculation for demo
+      const intensity = data.revenue / maxRevenue
       
       allPoints.push({
         country: `demo-${data.country}`,
@@ -394,7 +374,14 @@ export async function GET() {
     }
 
     console.log(`API: Successfully processed geographical data for ${combinedData.length} locations`)
-    return NextResponse.json(response)
+    return NextResponse.json(response, {
+      headers: {
+        // Cache geographical data for 5 minutes since it's less critical
+        'Cache-Control': 'public, max-age=300, stale-while-revalidate=600',
+        'CDN-Cache-Control': 'public, max-age=300',
+        'Vercel-CDN-Cache-Control': 'public, max-age=300',
+      }
+    })
 
   } catch (error) {
     console.error("API Error:", error)
@@ -409,6 +396,13 @@ export async function GET() {
       }
     }
     
-    return NextResponse.json(response)
+    return NextResponse.json(response, {
+      headers: {
+        // Cache error responses for 1 minute
+        'Cache-Control': 'public, max-age=60, stale-while-revalidate=120',
+        'CDN-Cache-Control': 'public, max-age=60',
+        'Vercel-CDN-Cache-Control': 'public, max-age=60',
+      }
+    })
   }
 } 

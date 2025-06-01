@@ -8,15 +8,15 @@ import path from "path"
 const REVENUE_ADJUSTMENT_ENABLED = false // Set to false to disable the adjustment
 const REVENUE_ADJUSTMENT_AMOUNT = 360000 // $360k flat adjustment
 
-// Initialize Stripe clients with timeout
+// Initialize Stripe clients with timeout - OPTIMIZED for Vercel
 const interviewCoderStripe = new Stripe(process.env.STRIPE_INTERVIEW_CODER || "", {
   apiVersion: "2025-05-28.basil",
-  timeout: 30000, // 30 second timeout
+  timeout: 15000, // Reduced from 30s to 15s for Vercel
 })
 
 const cluelyStripe = new Stripe(process.env.STRIPE_CLUELY || "", {
   apiVersion: "2025-05-28.basil",
-  timeout: 30000, // 30 second timeout
+  timeout: 15000, // Reduced from 30s to 15s for Vercel
 })
 
 interface DailyRevenue {
@@ -87,8 +87,8 @@ export async function GET() {
     let historicalData: CombinedRevenueData[] = []
 
     try {
-      // Path to the CSV file
-      const csvPath = path.join(process.cwd(), "app", "api", "revenue", "revenue_data_20250517_225551.csv")
+      // Path to the CSV file - UPDATED to use the new FIXED comprehensive historical data
+      const csvPath = path.join(process.cwd(), "app", "api", "revenue", "revenue_data_FIXED_20250601_1748737110175.csv")
       console.log(`API: Attempting to read CSV from ${csvPath}`)
 
       // Read the CSV file
@@ -120,6 +120,12 @@ export async function GET() {
       }))
 
       console.log(`API: Successfully converted ${historicalData.length} records to data format`)
+      
+      // Log the optimization details
+      const lastDate = historicalData.length > 0 ? historicalData[historicalData.length - 1].date : 'N/A'
+      console.log(`API: 🚀 Using OPTIMIZED approach with comprehensive historical CSV`)
+      console.log(`API: 📊 Historical data covers: ${historicalData.length} days (ending ${lastDate})`)
+      console.log(`API: ⚡ API will only fetch ~7 days of recent data for blazing fast performance!`)
     } catch (error) {
       console.error("API: Error reading or parsing CSV:", error)
       return NextResponse.json(
@@ -135,14 +141,14 @@ export async function GET() {
 
     // Get the last date from historical data
     const lastHistoricalDate =
-      historicalData.length > 0 ? new Date(historicalData[historicalData.length - 1].date) : new Date("2025-05-16") // Fallback to May 16th, 2025
+      historicalData.length > 0 ? new Date(historicalData[historicalData.length - 1].date) : new Date("2025-05-24") // Updated fallback to May 24th, 2025 (when new CSV ends)
 
     // Add one day to get the start date for recent data
     const recentDataStartDate = new Date(lastHistoricalDate)
     recentDataStartDate.setDate(recentDataStartDate.getDate() + 1)
     const recentDataStartTimestamp = Math.floor(recentDataStartDate.getTime() / 1000)
 
-    console.log(`API: Fetching recent data from ${recentDataStartDate.toISOString()} to present`)
+    console.log(`API: Fetching recent data from ${recentDataStartDate.toISOString()} to present (no date limit for accurate total revenue)`)
 
     // Get recent revenue data for both accounts
     console.log("API: Fetching Interview Coder recent revenue data...")
@@ -177,6 +183,8 @@ export async function GET() {
     const lastCluelyCumulative = lastHistoricalEntry ? lastHistoricalEntry.cumulative_amount_cluely : 0
     const lastTotalCumulative = lastHistoricalEntry ? lastHistoricalEntry.total_cumulative_revenue : 0
 
+    console.log(`API: Starting cumulative values - Interview Coder: $${lastInterviewCoderCumulative}, Cluely: $${lastCluelyCumulative}, Total: $${lastTotalCumulative}`)
+
     // Combine recent data
     console.log("API: Combining recent revenue data...")
     const recentData = combineRecentRevenueData(
@@ -187,8 +195,12 @@ export async function GET() {
       lastTotalCumulative,
     )
 
+    console.log(`API: Combined ${recentData.length} days of recent data`)
+
     // Combine historical and recent data
     const combinedData = [...historicalData, ...recentData]
+
+    console.log(`API: Final combined data has ${combinedData.length} total days (${historicalData.length} historical + ${recentData.length} recent)`)
 
     if (combinedData.length === 0) {
       console.log("API: No revenue data found")
@@ -227,6 +239,7 @@ export async function GET() {
 
     // Log revenue values for debugging
     console.log(`API: Revenue values - Interview Coder: $${revenueEntry.amount_interview_coder}, Cluely: $${revenueEntry.amount_cluely}, Total: $${revenueEntry.total_daily_revenue}`)
+    console.log(`API: Total cumulative revenue - Interview Coder: $${revenueEntry.cumulative_amount_interview_coder}, Cluely: $${revenueEntry.cumulative_amount_cluely}, Grand Total: $${revenueEntry.total_cumulative_revenue}`)
 
     // Prepare the response with better today_revenue handling
     const response = {
@@ -246,7 +259,14 @@ export async function GET() {
     }
 
     console.log("API: Successfully processed revenue data")
-    return NextResponse.json(response)
+    return NextResponse.json(response, {
+      headers: {
+        // Cache for 2 minutes to reduce API calls on Vercel
+        'Cache-Control': 'public, max-age=120, stale-while-revalidate=300',
+        'CDN-Cache-Control': 'public, max-age=120',
+        'Vercel-CDN-Cache-Control': 'public, max-age=120',
+      }
+    })
   } catch (error) {
     console.error("API Error:", error)
     return NextResponse.json(
@@ -309,12 +329,12 @@ async function getStripeRevenue(
   }
 }
 
-// IMPROVED: Helper function to fetch all transactions with better filtering
+// IMPROVED: Helper function to fetch all transactions with better filtering - OPTIMIZED for Vercel
 async function fetchAllTransactionsImproved(
   stripeClient: Stripe,
   startTimestamp: number,
   endTimestamp?: number,
-  maxPages = 20, // Increased from 10 for more comprehensive data
+  maxPages = 8, // Reduced from 15 to 8 since we now only fetch ~7 days of recent data
 ): Promise<Stripe.BalanceTransaction[]> {
   // Initialize an array to store all transactions
   const allTransactions: Stripe.BalanceTransaction[] = []
@@ -334,7 +354,7 @@ async function fetchAllTransactionsImproved(
   let lastId: string | undefined
   let pageCount = 0
 
-  // Manual pagination with safety limits
+  // Manual pagination with safety limits - OPTIMIZED for Vercel
   while (hasMore && pageCount < maxPages) {
     pageCount++
 
@@ -344,10 +364,10 @@ async function fetchAllTransactionsImproved(
         params.starting_after = lastId
       }
 
-      // Fetch a page of transactions with timeout handling
+      // Fetch a page of transactions with reduced timeout for Vercel
       const transactions = (await Promise.race([
         stripeClient.balanceTransactions.list(params),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Stripe API request timed out")), 20000)), // Increased timeout
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Stripe API request timed out")), 10000)), // Reduced from 20s to 10s
       ])) as Stripe.ApiList<Stripe.BalanceTransaction>
 
       // Add transactions to our collection
@@ -363,9 +383,9 @@ async function fetchAllTransactionsImproved(
 
       console.log(`Stripe: Fetched page ${pageCount}, got ${transactions.data.length} transactions`)
 
-      // Small delay to avoid rate limiting
+      // Reduced delay for faster processing on Vercel
       if (hasMore) {
-        await new Promise((resolve) => setTimeout(resolve, 100))
+        await new Promise((resolve) => setTimeout(resolve, 50)) // Reduced from 100ms to 50ms
       }
     } catch (error) {
       console.error(`Error fetching transactions page ${pageCount}:`, error)
@@ -384,7 +404,8 @@ async function fetchAllTransactionsImproved(
   }
 
   if (hasMore && pageCount >= maxPages) {
-    console.log(`Stripe: Reached maximum page limit (${maxPages}). Returning partial data.`)
+    console.log(`Stripe: Reached maximum page limit (${maxPages}). Returning partial data. Consider increasing limit if total revenue accuracy is affected.`)
+    console.log(`Stripe: WARNING - There may be more transactions available. Total revenue might be underreported.`)
   }
 
   console.log(`Stripe: Fetched a total of ${allTransactions.length} transactions`)

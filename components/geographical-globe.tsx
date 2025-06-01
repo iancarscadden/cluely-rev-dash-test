@@ -1,7 +1,17 @@
 "use client"
 
 import { useEffect, useRef, useState, useMemo } from "react"
-import Globe from "react-globe.gl"
+import dynamic from "next/dynamic"
+
+// Dynamically import Globe with no SSR
+const Globe = dynamic(() => import("react-globe.gl"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-full">
+      <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-400"></div>
+    </div>
+  )
+})
 
 interface GlobeDataPoint {
   country: string
@@ -34,7 +44,7 @@ const MOCK_DATA: GlobeDataPoint[] = [
     country: "GB",
     revenue: 45000,
     transactionCount: 12,
-    coordinates: [55.3781, -3.4360],
+    coordinates: [55.3781, -3.436],
     intensity: 0.3,
     size: 0.8,
     color: "#ff4444"
@@ -68,7 +78,11 @@ const MOCK_DATA: GlobeDataPoint[] = [
   }
 ]
 
-export default function GeographicalGlobe({ data = MOCK_DATA, className = "", todaysRevenue = 0 }: GeographicalGlobeProps) {
+export default function GeographicalGlobe({
+  data = MOCK_DATA,
+  className = "",
+  todaysRevenue = 0
+}: GeographicalGlobeProps) {
   const globeRef = useRef<any>(null)
   const [globeReady, setGlobeReady] = useState(false)
   const [time, setTime] = useState(0)
@@ -82,6 +96,8 @@ export default function GeographicalGlobe({ data = MOCK_DATA, className = "", to
 
   // Animation timer for pulsing effects
   useEffect(() => {
+    if (typeof window === "undefined") return
+
     const interval = setInterval(() => {
       setTime(Date.now() * 0.001)
     }, 50)
@@ -92,7 +108,7 @@ export default function GeographicalGlobe({ data = MOCK_DATA, className = "", to
   const globeData = useMemo(() => {
     if (!data || !Array.isArray(data)) {
       console.warn("GeographicalGlobe: No valid data provided, using mock data")
-      return MOCK_DATA.map(point => ({
+      return MOCK_DATA.map((point) => ({
         lat: point.coordinates[0],
         lng: point.coordinates[1],
         country: point.country,
@@ -104,36 +120,45 @@ export default function GeographicalGlobe({ data = MOCK_DATA, className = "", to
       }))
     }
 
-    const transformedData = data.map((point, index) => {
-      // Validate required fields
-      if (!point.coordinates || point.coordinates.length !== 2) {
-        console.warn(`GeographicalGlobe: Invalid coordinates for point ${index}:`, point)
-        return null
-      }
+    const transformedData = data
+      .map((point, index) => {
+        // Validate required fields
+        if (!point.coordinates || point.coordinates.length !== 2) {
+          console.warn(
+            `GeographicalGlobe: Invalid coordinates for point ${index}:`,
+            point
+          )
+          return null
+        }
 
-      // Enhanced color calculation based on intensity with better distribution
-      const getEnhancedColor = (intensity: number) => {
-        if (intensity > 0.8) return '#ff0040'      // Bright red for highest (80-100%)
-        if (intensity > 0.6) return '#ff4444'      // Red for high (60-80%)
-        if (intensity > 0.4) return '#ff6644'      // Orange-red for medium-high (40-60%)
-        if (intensity > 0.2) return '#ffaa44'      // Orange-yellow for medium (20-40%)
-        if (intensity > 0.1) return '#ffdd44'      // Yellow for low-medium (10-20%)
-        return '#44ff88'                           // Green for lowest (0-10%)
-      }
+        // Enhanced color calculation based on intensity with better distribution
+        const getEnhancedColor = (intensity: number) => {
+          if (intensity > 0.8) return "#ff0040" // Bright red for highest (80-100%)
+          if (intensity > 0.6) return "#ff4444" // Red for high (60-80%)
+          if (intensity > 0.4) return "#ff6644" // Orange-red for medium-high (40-60%)
+          if (intensity > 0.2) return "#ffaa44" // Orange-yellow for medium (20-40%)
+          if (intensity > 0.1) return "#ffdd44" // Yellow for low-medium (10-20%)
+          return "#44ff88" // Green for lowest (0-10%)
+        }
 
-      return {
-        lat: point.coordinates[0],
-        lng: point.coordinates[1],
-        country: point.country || `unknown-${index}`,
-        revenue: point.revenue || 0,
-        transactionCount: point.transactionCount || 0,
-        color: getEnhancedColor(point.intensity || 0),
-        size: Math.max(0.3, (point.intensity || 0.1) * 2.0), // Larger, more dynamic sizes
-        intensity: point.intensity || 0
-      }
-    }).filter((point): point is NonNullable<typeof point> => point !== null)
+        return {
+          lat: point.coordinates[0],
+          lng: point.coordinates[1],
+          country: point.country || `unknown-${index}`,
+          revenue: point.revenue || 0,
+          transactionCount: point.transactionCount || 0,
+          color: getEnhancedColor(point.intensity || 0),
+          size: Math.max(0.3, (point.intensity || 0.1) * 2.0), // Larger, more dynamic sizes
+          intensity: point.intensity || 0
+        }
+      })
+      .filter((point): point is NonNullable<typeof point> => point !== null)
 
-    console.log("GeographicalGlobe: Transformed data:", transformedData.length, "valid points")
+    console.log(
+      "GeographicalGlobe: Transformed data:",
+      transformedData.length,
+      "valid points"
+    )
     return transformedData
   }, [data])
 
@@ -146,7 +171,7 @@ export default function GeographicalGlobe({ data = MOCK_DATA, className = "", to
 
     // High-revenue arcs (red zones) - keep existing behavior
     const highRevenuePoints = globeData
-      .filter(point => point.intensity > 0.6)
+      .filter((point) => point.intensity > 0.6)
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 4) // Top 4 high revenue locations
 
@@ -157,65 +182,75 @@ export default function GeographicalGlobe({ data = MOCK_DATA, className = "", to
           startLng: highRevenuePoints[i].lng,
           endLat: highRevenuePoints[j].lat,
           endLng: highRevenuePoints[j].lng,
-          color: '#ff0040',
-          intensity: (highRevenuePoints[i].intensity + highRevenuePoints[j].intensity) / 2,
-          type: 'high'
+          color: "#ff0040",
+          intensity:
+            (highRevenuePoints[i].intensity + highRevenuePoints[j].intensity) /
+            2,
+          type: "high"
         })
       }
     }
 
     // San Francisco to Green Areas (Hub-and-spoke pattern)
     const greenAreas = globeData
-      .filter(point => point.intensity > 0.05 && point.intensity <= 0.3)
+      .filter((point) => point.intensity > 0.05 && point.intensity <= 0.3)
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 8) // Connect to top 8 green areas
 
-    greenAreas.forEach(point => {
+    greenAreas.forEach((point) => {
       allArcs.push({
         startLat: sanFrancisco.lat,
         startLng: sanFrancisco.lng,
         endLat: point.lat,
         endLng: point.lng,
-        color: '#44ff88', // Green lines from SF
+        color: "#44ff88", // Green lines from SF
         intensity: point.intensity,
-        type: 'sf-green'
+        type: "sf-green"
       })
     })
 
     // San Francisco to Yellow/Orange Areas
     const yellowAreas = globeData
-      .filter(point => point.intensity > 0.3 && point.intensity <= 0.6)
+      .filter((point) => point.intensity > 0.3 && point.intensity <= 0.6)
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 6) // Connect to top 6 yellow areas
 
-    yellowAreas.forEach(point => {
+    yellowAreas.forEach((point) => {
       allArcs.push({
         startLat: sanFrancisco.lat,
         startLng: sanFrancisco.lng,
         endLat: point.lat,
         endLng: point.lng,
-        color: '#ffaa44', // Yellow/orange lines from SF
+        color: "#ffaa44", // Yellow/orange lines from SF
         intensity: point.intensity,
-        type: 'sf-yellow'
+        type: "sf-yellow"
       })
     })
 
     // Medium-revenue arcs (yellow/orange zones) - reduce to avoid clutter
     const mediumRevenuePoints = globeData
-      .filter(point => point.intensity > 0.4 && point.intensity <= 0.6)
+      .filter((point) => point.intensity > 0.4 && point.intensity <= 0.6)
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 3) // Reduced from 5 to 3
 
     for (let i = 0; i < mediumRevenuePoints.length; i++) {
-      for (let j = i + 1; j < Math.min(mediumRevenuePoints.length, i + 2); j++) { // Connect to 1 nearest
+      for (
+        let j = i + 1;
+        j < Math.min(mediumRevenuePoints.length, i + 2);
+        j++
+      ) {
+        // Connect to 1 nearest
         allArcs.push({
           startLat: mediumRevenuePoints[i].lat,
           startLng: mediumRevenuePoints[i].lng,
           endLat: mediumRevenuePoints[j].lat,
           endLng: mediumRevenuePoints[j].lng,
-          color: '#ffaa44',
-          intensity: (mediumRevenuePoints[i].intensity + mediumRevenuePoints[j].intensity) / 2,
-          type: 'medium'
+          color: "#ffaa44",
+          intensity:
+            (mediumRevenuePoints[i].intensity +
+              mediumRevenuePoints[j].intensity) /
+            2,
+          type: "medium"
         })
       }
     }
@@ -226,8 +261,8 @@ export default function GeographicalGlobe({ data = MOCK_DATA, className = "", to
   // Create rings for highest revenue locations
   const ringsData = useMemo(() => {
     const highRevenueRings = globeData
-      .filter(point => point.intensity > 0.6)
-      .map(point => ({
+      .filter((point) => point.intensity > 0.6)
+      .map((point) => ({
         lat: point.lat,
         lng: point.lng,
         maxR: 1.5 + point.intensity * 2, // Reduced from 3 + point.intensity * 5 to be much smaller
@@ -238,8 +273,8 @@ export default function GeographicalGlobe({ data = MOCK_DATA, className = "", to
 
     // Add subtle rings for medium revenue areas (green/yellow)
     const mediumRevenueRings = globeData
-      .filter(point => point.intensity > 0.2 && point.intensity <= 0.6)
-      .map(point => ({
+      .filter((point) => point.intensity > 0.2 && point.intensity <= 0.6)
+      .map((point) => ({
         lat: point.lat,
         lng: point.lng,
         maxR: 0.8 + point.intensity * 1.2, // Much smaller rings for medium areas
@@ -250,8 +285,8 @@ export default function GeographicalGlobe({ data = MOCK_DATA, className = "", to
 
     // Add very subtle sparkle rings for low revenue areas (green)
     const lowRevenueRings = globeData
-      .filter(point => point.intensity <= 0.2)
-      .map(point => ({
+      .filter((point) => point.intensity <= 0.2)
+      .map((point) => ({
         lat: point.lat,
         lng: point.lng,
         maxR: 0.4 + point.intensity * 0.6, // Very small rings
@@ -271,25 +306,27 @@ export default function GeographicalGlobe({ data = MOCK_DATA, className = "", to
   // Get glow properties
   const glowIntensity = calculateGlowIntensity(todaysRevenue)
   const shouldFlash = todaysRevenue >= 10000
-  const glowOpacity = 0.6 + (glowIntensity * 1.2)
-  const glowSize = 900 + (glowIntensity * 600)
+  const glowOpacity = 0.6 + glowIntensity * 1.2
+  const glowSize = 900 + glowIntensity * 600
 
   useEffect(() => {
     if (globeRef.current) {
       // Set camera closer to globe to make it appear bigger
       globeRef.current.pointOfView({ altitude: 1.9, lat: 30, lng: -10 })
-      
+
       // Enable auto-rotation with slower, more subtle speed
       globeRef.current.controls().autoRotate = true
-      globeRef.current.controls().autoRotateSpeed = 0.08 + (glowIntensity * 0.12)
-      
+      globeRef.current.controls().autoRotateSpeed = 0.08 + glowIntensity * 0.12
+
       setGlobeReady(true)
     }
   }, [glowIntensity])
 
   const handlePointClick = (point: any) => {
-    console.log(`Clicked on ${point.country}: $${point.revenue.toLocaleString()}`)
-    
+    console.log(
+      `Clicked on ${point.country}: $${point.revenue.toLocaleString()}`
+    )
+
     // Add a cool camera animation when clicking a point
     if (globeRef.current) {
       globeRef.current.pointOfView(
@@ -300,10 +337,10 @@ export default function GeographicalGlobe({ data = MOCK_DATA, className = "", to
   }
 
   const getPointLabel = (point: any) => {
-    const [country, ...rest] = point.country.split('-')
-    const isDemo = country === 'demo'
+    const [country, ...rest] = point.country.split("-")
+    const isDemo = country === "demo"
     const actualCountry = isDemo ? rest[0] : country
-    
+
     return `
       <div style="
         background: linear-gradient(135deg, rgba(0, 0, 0, 0.95), rgba(20, 20, 40, 0.95)); 
@@ -318,7 +355,9 @@ export default function GeographicalGlobe({ data = MOCK_DATA, className = "", to
         backdrop-filter: blur(10px);
       ">
         <div style="margin-bottom: 12px;">
-          <strong style="color: ${point.color}; font-size: 18px; text-shadow: 0 0 10px ${point.color};">
+          <strong style="color: ${
+            point.color
+          }; font-size: 18px; text-shadow: 0 0 10px ${point.color};">
             ${actualCountry.toUpperCase()}
           </strong>
         </div>
@@ -328,11 +367,17 @@ export default function GeographicalGlobe({ data = MOCK_DATA, className = "", to
         </div>
         <div style="margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
           <span style="font-size: 20px;">📊</span>
-          <span>Transactions: <span style="color: #FBBF24; font-weight: bold;">${point.transactionCount || 0}</span></span>
+          <span>Transactions: <span style="color: #FBBF24; font-weight: bold;">${
+            point.transactionCount || 0
+          }</span></span>
         </div>
         <div style="margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
           <span style="font-size: 20px;">🔥</span>
-          <span>Intensity: <span style="color: ${point.color}; font-weight: bold;">${((point.intensity || 0) * 100).toFixed(1)}%</span></span>
+          <span>Intensity: <span style="color: ${
+            point.color
+          }; font-weight: bold;">${((point.intensity || 0) * 100).toFixed(
+      1
+    )}%</span></span>
         </div>
         <div style="color: #A78BFA; font-size: 12px; text-align: center; margin-top: 12px; opacity: 0.8;">
           Click to focus • Scroll to zoom
@@ -346,9 +391,9 @@ export default function GeographicalGlobe({ data = MOCK_DATA, className = "", to
       {/* Enhanced Dynamic Glow Background with Multiple Layers */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
         {/* Outermost atmospheric glow */}
-        <div 
+        <div
           className={`absolute rounded-full transition-all duration-2000 ease-in-out ${
-            shouldFlash ? 'animate-pulse' : ''
+            shouldFlash ? "animate-pulse" : ""
           }`}
           style={{
             width: `${glowSize * 1.4}px`,
@@ -360,13 +405,13 @@ export default function GeographicalGlobe({ data = MOCK_DATA, className = "", to
               rgba(191, 219, 254, ${glowOpacity * 0.1}) 60%, 
               transparent 80%
             )`,
-            filter: `blur(${80 + (glowIntensity * 120)}px)`,
-            animation: shouldFlash ? 'pulse 3s infinite' : 'none'
+            filter: `blur(${80 + glowIntensity * 120}px)`,
+            animation: shouldFlash ? "pulse 3s infinite" : "none"
           }}
         />
-        
+
         {/* Main glow layer with dynamic colors */}
-        <div 
+        <div
           className="absolute rounded-full transition-all duration-1500 ease-in-out"
           style={{
             width: `${glowSize}px`,
@@ -378,13 +423,13 @@ export default function GeographicalGlobe({ data = MOCK_DATA, className = "", to
               rgba(29, 78, 216, ${glowOpacity * 0.3}) 75%, 
               transparent 100%
             )`,
-            filter: `blur(${50 + (glowIntensity * 80)}px)`,
+            filter: `blur(${50 + glowIntensity * 80}px)`,
             transform: `scale(${1 + Math.sin(time * 0.5) * 0.1})` // Gentle breathing effect
           }}
         />
-        
+
         {/* Inner bright core with pulsing */}
-        <div 
+        <div
           className="absolute rounded-full transition-all duration-1000 ease-in-out"
           style={{
             width: `${glowSize * 0.6}px`,
@@ -395,16 +440,16 @@ export default function GeographicalGlobe({ data = MOCK_DATA, className = "", to
               rgba(96, 165, 250, ${glowOpacity * 0.4}) 70%, 
               transparent 100%
             )`,
-            filter: `blur(${30 + (glowIntensity * 50)}px)`,
+            filter: `blur(${30 + glowIntensity * 50}px)`,
             transform: `scale(${1 + Math.sin(time * 1.2) * 0.15})` // Faster pulsing
           }}
         />
-        
+
         {/* Revenue milestone flash effects */}
         {shouldFlash && (
           <>
             {/* Golden flash for high revenue */}
-            <div 
+            <div
               className="absolute rounded-full animate-ping"
               style={{
                 width: `${glowSize * 1.2}px`,
@@ -415,14 +460,14 @@ export default function GeographicalGlobe({ data = MOCK_DATA, className = "", to
                   rgba(217, 119, 6, 0.2) 60%, 
                   transparent 100%
                 )`,
-                filter: 'blur(60px)',
-                animationDuration: '4s',
-                animationIterationCount: 'infinite',
+                filter: "blur(60px)",
+                animationDuration: "4s",
+                animationIterationCount: "infinite"
               }}
             />
-            
+
             {/* Green success flash */}
-            <div 
+            <div
               className="absolute rounded-full animate-ping"
               style={{
                 width: `${glowSize * 0.8}px`,
@@ -432,9 +477,9 @@ export default function GeographicalGlobe({ data = MOCK_DATA, className = "", to
                   rgba(74, 222, 128, 0.3) 50%, 
                   transparent 100%
                 )`,
-                filter: 'blur(40px)',
-                animationDuration: '2.5s',
-                animationIterationCount: 'infinite',
+                filter: "blur(40px)",
+                animationDuration: "2.5s",
+                animationIterationCount: "infinite"
               }}
             />
           </>
@@ -444,105 +489,100 @@ export default function GeographicalGlobe({ data = MOCK_DATA, className = "", to
       <div className="w-full h-full relative z-30">
         <Globe
           ref={globeRef}
-          
           // Position globe on far right edge - half on screen, half off
           globeOffset={[850, 0]} // [x, y] offset - bringing it back to the left a bit
-          
           // Enhanced globe appearance
           globeImageUrl="//unpkg.com/three-globe/example/img/earth-night.jpg"
           bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
           backgroundImageUrl="//unpkg.com/three-globe/example/img/night-sky.png"
-          
           // Points configuration with enhanced effects - now as dots instead of cylinders
           pointsData={globeData}
           pointAltitude={0} // Changed from 0.08 to 0 - makes flat dots instead of 3D cylinders
           pointColor={(point: any) => {
             // Hide points for high intensity areas (>0.6) since they have rings
-            if (point.intensity > 0.6) return 'transparent'
+            if (point.intensity > 0.6) return "transparent"
             return point.color
           }}
           pointRadius={(point: any) => {
             // Make high intensity points much smaller or invisible
             if (point.intensity > 0.6) return 0
-            
+
             // Enhanced effects for medium and low revenue areas
             if (point.intensity <= 0.2) {
               // Green areas: gentle sparkle effect
-              const sparkle = 1 + Math.sin(time * 1.5 + point.lat * 0.2 + point.lng * 0.1) * 0.4
-              const randomTwinkle = 1 + Math.sin(time * 3 + point.lat * point.lng) * 0.2
+              const sparkle =
+                1 +
+                Math.sin(time * 1.5 + point.lat * 0.2 + point.lng * 0.1) * 0.4
+              const randomTwinkle =
+                1 + Math.sin(time * 3 + point.lat * point.lng) * 0.2
               return point.size * sparkle * randomTwinkle * 1.2
             } else {
               // Medium areas: gentle pulsing
-              const basePulse = 1 + Math.sin(time * 1.8 + point.lat * 0.15) * 0.35
+              const basePulse =
+                1 + Math.sin(time * 1.8 + point.lat * 0.15) * 0.35
               const intensityMultiplier = 0.8 + point.intensity * 1.5
               return point.size * basePulse * intensityMultiplier
             }
           }}
           pointResolution={16}
-          
           // Arcs for connecting revenue locations with different styles per level
           arcsData={arcsData}
           arcColor={(arc: any) => arc.color}
           arcAltitude={(arc: any) => {
             // Different altitudes for different revenue levels
-            if (arc.type === 'high') return 0.15      // Highest arcs for red zones
-            if (arc.type === 'sf-green') return 0.08  // Medium-low for SF to green connections
-            if (arc.type === 'sf-yellow') return 0.12 // Medium-high for SF to yellow connections
-            if (arc.type === 'medium') return 0.10    // Medium height for yellow/orange
-            return 0.06                               // Lower arcs for other connections
+            if (arc.type === "high") return 0.15 // Highest arcs for red zones
+            if (arc.type === "sf-green") return 0.08 // Medium-low for SF to green connections
+            if (arc.type === "sf-yellow") return 0.12 // Medium-high for SF to yellow connections
+            if (arc.type === "medium") return 0.1 // Medium height for yellow/orange
+            return 0.06 // Lower arcs for other connections
           }}
           arcStroke={(arc: any) => {
             // Different stroke weights for different revenue levels
-            if (arc.type === 'high') return 0.6       // Thickest for red zones
-            if (arc.type === 'sf-green') return 0.5   // Prominent for SF green connections
-            if (arc.type === 'sf-yellow') return 0.6  // Very prominent for SF yellow connections
-            if (arc.type === 'medium') return 0.4     // Medium thickness for yellow/orange
-            return 0.3                                // Thinnest for other connections
+            if (arc.type === "high") return 0.6 // Thickest for red zones
+            if (arc.type === "sf-green") return 0.5 // Prominent for SF green connections
+            if (arc.type === "sf-yellow") return 0.6 // Very prominent for SF yellow connections
+            if (arc.type === "medium") return 0.4 // Medium thickness for yellow/orange
+            return 0.3 // Thinnest for other connections
           }}
           arcDashLength={(arc: any) => {
             // Different dash patterns for visual variety
-            if (arc.type === 'high') return 0.4       // Standard dashing for red
-            if (arc.type === 'sf-green') return 0.5   // Slightly longer for SF green lines
-            if (arc.type === 'sf-yellow') return 0.4  // Standard for SF yellow lines
-            if (arc.type === 'medium') return 0.6     // Longer dashes for medium
-            return 0.8                                // Longest dashes for others
+            if (arc.type === "high") return 0.4 // Standard dashing for red
+            if (arc.type === "sf-green") return 0.5 // Slightly longer for SF green lines
+            if (arc.type === "sf-yellow") return 0.4 // Standard for SF yellow lines
+            if (arc.type === "medium") return 0.6 // Longer dashes for medium
+            return 0.8 // Longest dashes for others
           }}
           arcDashGap={(arc: any) => {
-            if (arc.type === 'high') return 0.2       // Standard gaps for red
-            if (arc.type === 'sf-green') return 0.25  // Slightly larger gaps for SF green
-            if (arc.type === 'sf-yellow') return 0.2  // Standard gaps for SF yellow
-            if (arc.type === 'medium') return 0.3     // Larger gaps for medium
-            return 0.4                                // Largest gaps for others
+            if (arc.type === "high") return 0.2 // Standard gaps for red
+            if (arc.type === "sf-green") return 0.25 // Slightly larger gaps for SF green
+            if (arc.type === "sf-yellow") return 0.2 // Standard gaps for SF yellow
+            if (arc.type === "medium") return 0.3 // Larger gaps for medium
+            return 0.4 // Largest gaps for others
           }}
           arcDashAnimateTime={(arc: any) => {
             // Different animation speeds for visual hierarchy
-            if (arc.type === 'high') return 1500      // Fastest animation for red zones
-            if (arc.type === 'sf-green') return 2000  // Smooth speed for SF green connections
-            if (arc.type === 'sf-yellow') return 1800 // Slightly faster for SF yellow connections
-            if (arc.type === 'medium') return 2500    // Medium speed for yellow/orange
-            return 3500                               // Slowest for others
+            if (arc.type === "high") return 1500 // Fastest animation for red zones
+            if (arc.type === "sf-green") return 2000 // Smooth speed for SF green connections
+            if (arc.type === "sf-yellow") return 1800 // Slightly faster for SF yellow connections
+            if (arc.type === "medium") return 2500 // Medium speed for yellow/orange
+            return 3500 // Slowest for others
           }}
-          
           // Rings for top locations
           ringsData={ringsData}
           ringColor={(ring: any) => ring.color}
           ringMaxRadius={(ring: any) => ring.maxR}
           ringPropagationSpeed={(ring: any) => ring.propagationSpeed}
           ringRepeatPeriod={(ring: any) => ring.repeatPeriod}
-          
           // Enhanced atmosphere
           showAtmosphere={true}
           atmosphereColor="lightskyblue"
           atmosphereAltitude={0.25}
-          
           // Interactivity
           onPointClick={handlePointClick}
           pointLabel={getPointLabel}
-          
           // Animation and controls
           animateIn={true}
           enablePointerInteraction={true}
-          
           // Enhanced performance settings
           rendererConfig={{
             antialias: true,
@@ -551,7 +591,7 @@ export default function GeographicalGlobe({ data = MOCK_DATA, className = "", to
           }}
         />
       </div>
-      
+
       {/* Enhanced loading indicator */}
       {!globeReady && (
         <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-70 z-30">
@@ -560,15 +600,23 @@ export default function GeographicalGlobe({ data = MOCK_DATA, className = "", to
               <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-400"></div>
               <div className="absolute top-0 left-0 animate-ping rounded-full h-16 w-16 border-2 border-blue-400 opacity-20"></div>
             </div>
-            <p className="text-xl text-white font-medium">Initializing Global Revenue Map...</p>
+            <p className="text-xl text-white font-medium">
+              Initializing Global Revenue Map...
+            </p>
             <div className="flex space-x-2">
               <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
-              <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-              <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              <div
+                className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"
+                style={{ animationDelay: "0.1s" }}
+              ></div>
+              <div
+                className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"
+                style={{ animationDelay: "0.2s" }}
+              ></div>
             </div>
           </div>
         </div>
       )}
     </div>
   )
-} 
+}
