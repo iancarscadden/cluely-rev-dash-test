@@ -308,7 +308,6 @@ export default function RevenueDashboard() {
       {/* Centered Chart Layout */}
       <div className="absolute inset-0 z-10 flex flex-col justify-start pt-8">
         <div className="w-full max-w-6xl mx-auto px-8">
-          {/* Revenue Metrics Row - Above Chart - Moved up and aligned */}
           <div className="flex items-center justify-between gap-8 mb-6">
             {/* Total Revenue - Left - Same size as Today's */}
             <div className="flex-1">
