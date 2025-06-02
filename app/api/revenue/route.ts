@@ -12,7 +12,7 @@ const REVENUE_ADJUSTMENT_AMOUNT = 360000 // $360k flat adjustment
 const interviewCoderStripe = new Stripe(
   process.env.STRIPE_INTERVIEW_CODER || "",
   {
-    apiVersion: "2025-05-28.basil",
+  apiVersion: "2025-05-28.basil",
     timeout: 15000 // Reduced from 30s to 15s for Vercel
   }
 )
@@ -51,8 +51,8 @@ interface CSVRecord {
 // Helper function to convert UTC timestamp to Pacific Time date string (YYYY-MM-DD)
 function convertToPacificTime(timestamp: number): string {
   try {
-    // Create a date object from the timestamp (in milliseconds)
-    const date = new Date(timestamp * 1000)
+  // Create a date object from the timestamp (in milliseconds)
+  const date = new Date(timestamp * 1000)
 
     // Validate the date object
     if (isNaN(date.getTime())) {
@@ -62,10 +62,10 @@ function convertToPacificTime(timestamp: number): string {
 
     // Format the date in Pacific Time and construct YYYY-MM-DD properly
     const formatted = new Intl.DateTimeFormat("en-US", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "America/Los_Angeles",
     }).format(date)
     
     // Split MM/DD/YYYY and reconstruct as YYYY-MM-DD
@@ -116,7 +116,7 @@ export async function GET() {
         "app",
         "api",
         "revenue",
-        "revenue_data_FIXED_20250601_1748737110175.csv"
+        "revenue_data_FIXED_20250602_1748850111060.csv"
       )
       console.log(`API: Attempting to read CSV from ${csvPath}`)
 
@@ -167,7 +167,7 @@ export async function GET() {
         `API: 📊 Historical data covers: ${historicalData.length} days (ending ${lastDate})`
       )
       console.log(
-        `API: ⚡ API will only fetch ~7 days of recent data for blazing fast performance!`
+        `API: ⚡ API will only fetch ~1 day of recent data for blazing fast performance!`
       )
     } catch (error) {
       console.error("API: Error reading or parsing CSV:", error)
@@ -192,7 +192,7 @@ export async function GET() {
     const lastHistoricalDate =
       historicalData.length > 0
         ? new Date(historicalData[historicalData.length - 1].date)
-        : new Date("2025-05-24") // Updated fallback to May 24th, 2025 (when new CSV ends)
+        : new Date("2025-06-01") // Updated fallback to June 1st, 2025 (when new CSV ends)
 
     // Add one day to get the start date for recent data
     const recentDataStartDate = new Date(lastHistoricalDate)
@@ -202,7 +202,7 @@ export async function GET() {
     )
 
     console.log(
-      `API: Fetching recent data from ${recentDataStartDate.toISOString()} to present (no date limit for accurate total revenue)`
+      `API: Fetching recent data from ${recentDataStartDate.toISOString()} to present (optimized to ~1 day for fast performance)`
     )
 
     // Get recent revenue data for both accounts
@@ -309,18 +309,18 @@ export async function GET() {
     const todayEntry = combinedData.find(
       (entry) => entry.date === todayDateString
     )
-
+    
     // If today's data isn't available yet, use the most recent entry
     const lastEntry = combinedData[combinedData.length - 1]
     const revenueEntry = todayEntry || lastEntry
-
+    
     const usingTodayData = !!todayEntry
     console.log(
       `API: Using ${
         usingTodayData ? "today's" : "most recent"
       } revenue data from date: ${revenueEntry.date}`
     )
-
+    
     if (!usingTodayData) {
       console.log(
         `API: Today's data (${todayDateString}) not available yet. Using most recent data from ${revenueEntry.date}`
@@ -449,7 +449,7 @@ async function fetchAllTransactionsImproved(
   stripeClient: Stripe,
   startTimestamp: number,
   endTimestamp?: number,
-  maxPages = 20, // Increased from 8 to 20 to ensure we capture all recent transactions (only ~7 days)
+  maxPages = 8, // Reduced back to 8 since we now only fetch 1 day of recent data
 ): Promise<Stripe.BalanceTransaction[]> {
   // Initialize an array to store all transactions
   const allTransactions: Stripe.BalanceTransaction[] = []
@@ -532,7 +532,7 @@ async function fetchAllTransactionsImproved(
       `Stripe: Reached maximum page limit (${maxPages}). Returning partial data. Consider increasing limit if total revenue accuracy is affected.`
     )
     console.log(
-      `Stripe: WARNING - There may be more transactions available. Total revenue might be underreported.`
+      `Stripe: WARNING - There may be more transactions available for recent data (last 1 day). Total revenue might be underreported.`
     )
   }
 
