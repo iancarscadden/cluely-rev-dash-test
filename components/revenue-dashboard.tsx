@@ -297,13 +297,13 @@ export default function RevenueDashboard() {
       )}
 
       {/* Full-screen Globe Background */}
-      {/* <div className="absolute inset-0 w-full h-full">
+      <div className="absolute inset-0 w-full h-full">
         <GeographicalGlobe 
           className="w-full h-full relative z-10" 
           todaysRevenue={typeof getTodayRevenue() === 'number' ? getTodayRevenue() as number : 0}
           data={geographicalData?.geographical_data?.combined || undefined}
         />
-      </div> */}
+      </div>
 
       {/* Centered Chart Layout */}
       <div className="absolute inset-0 z-10 flex flex-col justify-start pt-8">
