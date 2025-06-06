@@ -110,13 +110,13 @@ export async function GET() {
     let historicalData: CombinedRevenueData[] = []
 
     try {
-      // Path to the CSV file - UPDATED to use the new FIXED comprehensive historical data
+      // Path to the CSV file - UPDATED to use the new June 6th comprehensive historical data
       const csvPath = path.join(
         process.cwd(),
         "app",
         "api",
         "revenue",
-        "revenue_data_FIXED_20250602_1748850111060.csv"
+        "revenue_data_jun6th.csv"
       )
       console.log(`API: Attempting to read CSV from ${csvPath}`)
 
