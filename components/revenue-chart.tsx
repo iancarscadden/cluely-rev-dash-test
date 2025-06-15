@@ -128,7 +128,7 @@ export function RevenueChart({ data, splitRevenue, showARR }: RevenueChartProps)
       const dataPoint = payload[0].payload
 
       return (
-        <div className="bg-white p-6 border border-gray-200 rounded-lg shadow-md">
+        <div className="bg-white p-6 border-2 border-gray-300 rounded-lg shadow-lg">
           <p className="font-medium mb-3 text-gray-800 text-xl">{dataPoint.fullDate}</p>
           {payload.map((entry, index) => (
             <div key={`tooltip-${index}`} className="flex items-center gap-3 mb-2">
@@ -150,12 +150,12 @@ export function RevenueChart({ data, splitRevenue, showARR }: RevenueChartProps)
       <style jsx>{`
         .recharts-cartesian-grid-horizontal line,
         .recharts-cartesian-grid-vertical line {
-          stroke: rgba(255, 255, 255, 0.1);
+          stroke: rgba(0, 0, 0, 0.1);
           stroke-width: 1;
         }
         
         .recharts-cartesian-axis-line {
-          stroke: rgba(255, 255, 255, 0.3);
+          stroke: rgba(0, 0, 0, 0.3);
           stroke-width: 2;
         }
         
@@ -171,10 +171,10 @@ export function RevenueChart({ data, splitRevenue, showARR }: RevenueChartProps)
       <ResponsiveContainer width="100%" height="100%">
         {splitRevenue ? (
           <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 40 }}>
-            {/* Enhanced grid with subtle glow */}
+            {/* Enhanced grid with subtle lines */}
             <CartesianGrid 
               strokeDasharray="3 3" 
-              stroke="rgba(255,255,255,0.08)" 
+              stroke="rgba(0,0,0,0.1)" 
               strokeWidth={1}
               className="opacity-60"
             />
@@ -184,14 +184,14 @@ export function RevenueChart({ data, splitRevenue, showARR }: RevenueChartProps)
               dataKey="date"
               tick={{ 
                 fontSize: 14, 
-                fill: "#ffffff", 
-                fontWeight: "bold"
+                fill: "#374151", 
+                fontWeight: "600"
               }}
-              stroke="rgba(255,255,255,0.4)"
+              stroke="rgba(0,0,0,0.4)"
               strokeWidth={2}
               ticks={monthTicks}
-              axisLine={{ stroke: "rgba(255,255,255,0.4)", strokeWidth: 2 }}
-              tickLine={{ stroke: "rgba(255,255,255,0.4)", strokeWidth: 2 }}
+              axisLine={{ stroke: "rgba(0,0,0,0.4)", strokeWidth: 2 }}
+              tickLine={{ stroke: "rgba(0,0,0,0.4)", strokeWidth: 2 }}
               type="category"
               interval={0}
             />
@@ -201,49 +201,49 @@ export function RevenueChart({ data, splitRevenue, showARR }: RevenueChartProps)
               tickFormatter={(value) => formatTooltip(value)}
               tick={{ 
                 fontSize: 14, 
-                fill: "#ffffff", 
-                fontWeight: "bold"
+                fill: "#374151", 
+                fontWeight: "600"
               }}
-              stroke="rgba(255,255,255,0.4)"
+              stroke="rgba(0,0,0,0.4)"
               strokeWidth={2}
               width={100}
-              axisLine={{ stroke: "rgba(255,255,255,0.4)", strokeWidth: 2 }}
-              tickLine={{ stroke: "rgba(255,255,255,0.4)", strokeWidth: 2 }}
+              axisLine={{ stroke: "rgba(0,0,0,0.4)", strokeWidth: 2 }}
+              tickLine={{ stroke: "rgba(0,0,0,0.4)", strokeWidth: 2 }}
             />
 
-            {/* Enhanced Cluely line with glow effect */}
+            {/* Enhanced Cluely line */}
             <Line
               type="monotone"
               dataKey="cumulative_amount_cluely"
               name="Cluely Revenue"
-              stroke="#60A5FA"
+              stroke="#3B82F6"
               strokeWidth={4}
               dot={false}
               activeDot={{ 
                 r: 8, 
                 strokeWidth: 3, 
-                fill: "#60A5FA",
+                fill: "#3B82F6",
                 stroke: "#ffffff",
-                filter: "drop-shadow(0 0 8px #60A5FA)"
+                filter: "drop-shadow(0 0 8px #3B82F6)"
               }}
               className="line-glow"
               animationDuration={2000}
             />
             
-            {/* Enhanced Interview Coder line with glow effect */}
+            {/* Enhanced Interview Coder line */}
             <Line
               type="monotone"
               dataKey="cumulative_amount_interview_coder"
               name="Interview Coder Revenue"
-              stroke="#FBBF24"
+              stroke="#F59E0B"
               strokeWidth={4}
               dot={false}
               activeDot={{ 
                 r: 8, 
                 strokeWidth: 3, 
-                fill: "#FBBF24",
+                fill: "#F59E0B",
                 stroke: "#ffffff",
-                filter: "drop-shadow(0 0 8px #FBBF24)"
+                filter: "drop-shadow(0 0 8px #F59E0B)"
               }}
               className="line-glow"
               animationDuration={2000}
@@ -251,27 +251,27 @@ export function RevenueChart({ data, splitRevenue, showARR }: RevenueChartProps)
           </LineChart>
         ) : (
           <AreaChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 40 }}>
-            {/* Enhanced gradient definitions */}
+            {/* Enhanced gradient definitions for white background */}
             <defs>
               <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#60A5FA" stopOpacity={0.9} />
-                <stop offset="25%" stopColor="#60A5FA" stopOpacity={0.6} />
-                <stop offset="50%" stopColor="#60A5FA" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#60A5FA" stopOpacity={0.05} />
+                <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8} />
+                <stop offset="25%" stopColor="#3B82F6" stopOpacity={0.5} />
+                <stop offset="50%" stopColor="#3B82F6" stopOpacity={0.2} />
+                <stop offset="95%" stopColor="#3B82F6" stopOpacity={0.05} />
               </linearGradient>
               
-              {/* Glowing border gradient */}
+              {/* Border gradient for white background */}
               <linearGradient id="glowBorder" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#ffffff" stopOpacity={0.8} />
-                <stop offset="50%" stopColor="#60A5FA" stopOpacity={0.9} />
-                <stop offset="100%" stopColor="#3B82F6" stopOpacity={0.7} />
+                <stop offset="0%" stopColor="#1E40AF" stopOpacity={0.9} />
+                <stop offset="50%" stopColor="#3B82F6" stopOpacity={0.8} />
+                <stop offset="100%" stopColor="#60A5FA" stopOpacity={0.7} />
               </linearGradient>
             </defs>
             
             {/* Enhanced grid */}
             <CartesianGrid 
               strokeDasharray="3 3" 
-              stroke="rgba(255,255,255,0.08)" 
+              stroke="rgba(0,0,0,0.1)" 
               strokeWidth={1}
               className="opacity-60"
             />
@@ -281,14 +281,14 @@ export function RevenueChart({ data, splitRevenue, showARR }: RevenueChartProps)
               dataKey="date"
               tick={{ 
                 fontSize: 14, 
-                fill: "#ffffff", 
-                fontWeight: "bold"
+                fill: "#374151", 
+                fontWeight: "600"
               }}
-              stroke="rgba(255,255,255,0.4)"
+              stroke="rgba(0,0,0,0.4)"
               strokeWidth={2}
               ticks={monthTicks}
-              axisLine={{ stroke: "rgba(255,255,255,0.4)", strokeWidth: 2 }}
-              tickLine={{ stroke: "rgba(255,255,255,0.4)", strokeWidth: 2 }}
+              axisLine={{ stroke: "rgba(0,0,0,0.4)", strokeWidth: 2 }}
+              tickLine={{ stroke: "rgba(0,0,0,0.4)", strokeWidth: 2 }}
               type="category"
               interval={0}
             />
@@ -298,17 +298,17 @@ export function RevenueChart({ data, splitRevenue, showARR }: RevenueChartProps)
               tickFormatter={(value) => formatTooltip(value)}
               tick={{ 
                 fontSize: 14, 
-                fill: "#ffffff", 
-                fontWeight: "bold"
+                fill: "#374151", 
+                fontWeight: "600"
               }}
-              stroke="rgba(255,255,255,0.4)"
+              stroke="rgba(0,0,0,0.4)"
               strokeWidth={2}
               width={100}
-              axisLine={{ stroke: "rgba(255,255,255,0.4)", strokeWidth: 2 }}
-              tickLine={{ stroke: "rgba(255,255,255,0.4)", strokeWidth: 2 }}
+              axisLine={{ stroke: "rgba(0,0,0,0.4)", strokeWidth: 2 }}
+              tickLine={{ stroke: "rgba(0,0,0,0.4)", strokeWidth: 2 }}
             />
             
-            {/* Enhanced area with dramatic gradient and glow */}
+            {/* Enhanced area with gradient optimized for white background */}
             <Area
               type="monotone"
               dataKey="total_cumulative_revenue"
@@ -321,9 +321,9 @@ export function RevenueChart({ data, splitRevenue, showARR }: RevenueChartProps)
               activeDot={{ 
                 r: 8, 
                 strokeWidth: 3, 
-                fill: "#60A5FA",
+                fill: "#3B82F6",
                 stroke: "#ffffff",
-                filter: "drop-shadow(0 0 12px #60A5FA)"
+                filter: "drop-shadow(0 0 12px #3B82F6)"
               }}
               className="chart-glow"
               animationDuration={2000}

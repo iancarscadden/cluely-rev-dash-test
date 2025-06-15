@@ -8,17 +8,6 @@ import { SettingsPanel } from "./settings-panel"
 import { formatCurrency } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { format, parseISO, isValid } from "date-fns"
-import dynamic from "next/dynamic"
-
-// Dynamically import GeographicalGlobe with SSR disabled
-const GeographicalGlobe = dynamic(() => import("./geographical-globe"), {
-  ssr: false, // This prevents server-side rendering
-  loading: () => (
-    <div className="w-full h-full flex items-center justify-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white opacity-50"></div>
-    </div>
-  )
-})
 
 // Types for our revenue data
 interface RevenueData {
@@ -96,7 +85,6 @@ function safeFormatDate(dateString: string, formatStr: string): string {
 export default function RevenueDashboard() {
   // State for revenue data
   const [revenueData, setRevenueData] = useState<RevenueResponse | null>(null)
-  const [geographicalData, setGeographicalData] = useState<any>(null)
   const [initialLoading, setInitialLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -135,17 +123,10 @@ export default function RevenueDashboard() {
         }
       }
 
-      // Fetch both revenue and geographical data in parallel
-      const [revenueResponse, geographicalResponse] = await Promise.all([
-        // Revenue data
-        fetch("/api/revenue", {
-          cache: "no-store"
-        }),
-        // Geographical data
-        fetch("/api/geographical", {
-          cache: "no-store"
-        })
-      ])
+      // Fetch revenue data only (removed geographical data fetching)
+      const revenueResponse = await fetch("/api/revenue", {
+        cache: "no-store"
+      })
 
       if (!revenueResponse.ok) {
         throw new Error(`Revenue API error! status: ${revenueResponse.status}`)
@@ -163,36 +144,6 @@ export default function RevenueDashboard() {
         setRevenueData(newRevenueData)
         setError(null)
         console.log("Dashboard: Revenue data updated successfully")
-      }
-
-      // Handle geographical data (don't fail if this errors)
-      if (geographicalResponse.ok) {
-        const newGeographicalData = await geographicalResponse.json()
-        console.log(
-          "Dashboard: Geographical data received",
-          newGeographicalData
-        )
-
-        if (!newGeographicalData.error) {
-          setGeographicalData(newGeographicalData)
-          console.log("Dashboard: Geographical data updated successfully")
-          console.log(
-            "Dashboard: Combined geographical data points:",
-            newGeographicalData.geographical_data?.combined?.length || 0
-          )
-        } else {
-          console.warn(
-            "Dashboard: Geographical data error:",
-            newGeographicalData.error
-          )
-        }
-      } else {
-        console.warn("Dashboard: Geographical API failed, using mock data")
-        console.warn("Dashboard: Response status:", geographicalResponse.status)
-        console.warn(
-          "Dashboard: Response statusText:",
-          geographicalResponse.statusText
-        )
       }
     } catch (err) {
       console.error("Dashboard: Failed to fetch revenue data", err)
@@ -286,56 +237,63 @@ export default function RevenueDashboard() {
   }
 
   return (
-    <div className="w-screen h-screen bg-black relative overflow-hidden">
+    <div 
+      className="w-screen h-screen relative overflow-hidden"
+      style={{
+        background: `
+          radial-gradient(circle at 20% 30%, #a0c2fe 0%, transparent 50%),
+          radial-gradient(circle at 80% 20%, #d3e4fe 0%, transparent 50%),
+          radial-gradient(circle at 40% 70%, #a0c2fe 0%, transparent 40%),
+          radial-gradient(circle at 90% 80%, #d3e4fe 0%, transparent 45%),
+          radial-gradient(circle at 10% 90%, #a0c2fe 0%, transparent 35%),
+          radial-gradient(circle at 70% 50%, #d3e4fe 0%, transparent 40%),
+          radial-gradient(circle at 30% 10%, #a0c2fe 0%, transparent 30%),
+          linear-gradient(135deg, #b8d0fe 0%, #c8dbfe 100%)
+        `
+      }}
+    >
       {/* Settings panel */}
       {showSettings && (
-        <SettingsPanel
-          splitRevenue={splitRevenue}
-          setSplitRevenue={setSplitRevenue}
-          onClose={() => setShowSettings(false)}
-        />
+        <div className="relative z-20">
+          <SettingsPanel
+            splitRevenue={splitRevenue}
+            setSplitRevenue={setSplitRevenue}
+            onClose={() => setShowSettings(false)}
+          />
+        </div>
       )}
 
-      {/* Full-screen Globe Background */}
-      <div className="absolute inset-0 w-full h-full">
-        <GeographicalGlobe 
-          className="w-full h-full relative z-10" 
-          todaysRevenue={typeof getTodayRevenue() === 'number' ? getTodayRevenue() as number : 0}
-          data={geographicalData?.geographical_data?.combined || undefined}
-        />
-      </div>
-
-      {/* Centered Chart Layout */}
-      <div className="absolute inset-0 z-10 flex flex-col justify-start pt-8">
+      {/* Main Content */}
+      <div className="w-full h-full flex flex-col justify-start pt-8 relative z-10">
         <div className="w-full max-w-6xl mx-auto px-8">
           <div className="flex items-center justify-between gap-8 mb-6">
             {/* Total Revenue - Left - Same size as Today's */}
             <div className="flex-1">
-              <div className="bg-black bg-opacity-40 backdrop-blur-sm rounded-xl p-8 border border-white border-opacity-20 relative overflow-hidden">
+              <div className="bg-white/50 backdrop-blur-sm border-2 border-gray-200 rounded-xl p-8 shadow-lg relative overflow-hidden">
                 {/* Cluely Logo in top right corner of revenue box */}
-                <div className="absolute top-4 right-4 pointer-events-none opacity-20">
+                <div className="absolute top-4 right-4 pointer-events-none">
                   <svg
-                    className="w-16 h-16 text-white"
+                    className="w-16 h-16 text-black"
                     viewBox="0 0 64.37 64.41"
                     xmlns="http://www.w3.org/2000/svg"
                   >
                     <g>
                       <path
-                        className="fill-current"
+                        className="fill-black"
                         d="M42.81,1.81C17.56-6.81-6.47,16.8,1.58,42.22c7.4,23.37,38.16,29.95,54.52,11.65,15.33-17.14,8.47-44.63-13.29-52.06ZM8.41,25.04c5.36,4.43,12.1,6.67,19.07,6.57l-15.39,15.28c-4.52-6.29-5.93-14.4-3.68-21.85ZM39.17,56.12c-7.39,2.12-15.45.71-21.64-3.8l15.48-15.59c-.25,2.3.05,4.89.51,7.19.46,2.27,1.4,4.91,2.46,6.97.9,1.75,2.24,3.22,3.19,4.82.11.19.34.14,0,.41ZM52.05,47.26c-.75,1-4.45,5.03-5.45,5.23-.61.13-2-1.71-2.39-2.24-6.37-8.74-4.83-20.87,3.15-28,.05-.19-.1-.27-.18-.39-.33-.49-4.12-4.28-4.62-4.62-.22-.15-.22-.26-.52-.11-.49.26-1.75,1.86-2.37,2.37-7.94,6.65-20.62,6.25-27.75-1.36,3.6-5.98,11.06-10.08,17.98-10.67,21.49-1.84,35.18,22.53,22.15,39.79Z"
                       />
                     </g>
                   </svg>
                 </div>
 
-                <h2 className="text-3xl font-semibold text-white mb-6">
+                <h2 className="text-3xl font-semibold text-black mb-6">
                   Total Revenue
                 </h2>
 
                 {initialLoading ? (
-                  <div className="h-20 w-80 bg-white bg-opacity-20 rounded animate-pulse" />
+                  <div className="h-20 w-80 bg-gray-200 rounded animate-pulse" />
                 ) : error && !revenueData ? (
-                  <div className="text-red-400 text-xl flex items-center gap-2">
+                  <div className="text-red-600 text-xl flex items-center gap-2">
                     <AlertCircle className="h-6 w-6" />
                     <span>Error loading data</span>
                   </div>
@@ -344,7 +302,7 @@ export default function RevenueDashboard() {
                     <div>
                       <div className="flex items-center gap-3 mb-2">
                         <div className="w-4 h-4 bg-blue-400 rounded-full"></div>
-                        <p className="text-xl text-white opacity-80">Cluely</p>
+                        <p className="text-xl text-black opacity-80">Cluely</p>
                       </div>
                       <CountUp
                         value={
@@ -357,14 +315,14 @@ export default function RevenueDashboard() {
                             ? (getPrevValue() as any).cluely
                             : 0
                         }
-                        className="text-5xl font-bold text-white"
+                        className="text-5xl font-bold text-black"
                         duration={2000}
                       />
                     </div>
                     <div>
                       <div className="flex items-center gap-3 mb-2">
                         <div className="w-4 h-4 bg-yellow-400 rounded-full"></div>
-                        <p className="text-xl text-white opacity-80">
+                        <p className="text-xl text-black opacity-80">
                           Interview Coder
                         </p>
                       </div>
@@ -379,7 +337,7 @@ export default function RevenueDashboard() {
                             ? (getPrevValue() as any).interviewCoder
                             : 0
                         }
-                        className="text-5xl font-bold text-white"
+                        className="text-5xl font-bold text-black"
                         duration={2000}
                       />
                     </div>
@@ -396,7 +354,7 @@ export default function RevenueDashboard() {
                         ? (getPrevValue() as number)
                         : 0
                     }
-                    className="text-7xl font-bold text-white"
+                    className="text-7xl font-bold text-black"
                     duration={2000}
                   />
                 )}
@@ -405,15 +363,15 @@ export default function RevenueDashboard() {
 
             {/* Today's Revenue - Right - Same size as Total */}
             <div className="flex-1">
-              <div className="bg-black bg-opacity-40 backdrop-blur-sm rounded-xl p-8 border border-white border-opacity-20">
-                <h2 className="text-3xl font-semibold text-white mb-6">
+              <div className="bg-white/50 backdrop-blur-sm border-2 border-gray-200 rounded-xl p-8 shadow-lg">
+                <h2 className="text-3xl font-semibold text-black mb-6">
                   Today's Revenue
                 </h2>
 
                 {initialLoading ? (
-                  <div className="h-20 w-80 bg-white bg-opacity-20 rounded animate-pulse" />
+                  <div className="h-20 w-80 bg-gray-200 rounded animate-pulse" />
                 ) : error && !revenueData ? (
-                  <div className="text-red-400 text-xl flex items-center gap-2">
+                  <div className="text-red-600 text-xl flex items-center gap-2">
                     <AlertCircle className="h-6 w-6" />
                     <span>Error loading data</span>
                   </div>
@@ -422,9 +380,9 @@ export default function RevenueDashboard() {
                     <div>
                       <div className="flex items-center gap-3 mb-2">
                         <div className="w-4 h-4 bg-blue-400 rounded-full"></div>
-                        <p className="text-xl text-white opacity-80">Cluely</p>
+                        <p className="text-xl text-black opacity-80">Cluely</p>
                       </div>
-                      <p className="text-5xl font-bold text-white">
+                      <p className="text-5xl font-bold text-black">
                         {formatCurrency(
                           splitRevenue && typeof getTodayRevenue() === "object"
                             ? (getTodayRevenue() as any).cluely
@@ -435,11 +393,11 @@ export default function RevenueDashboard() {
                     <div>
                       <div className="flex items-center gap-3 mb-2">
                         <div className="w-4 h-4 bg-yellow-400 rounded-full"></div>
-                        <p className="text-xl text-white opacity-80">
+                        <p className="text-xl text-black opacity-80">
                           Interview Coder
                         </p>
                       </div>
-                      <p className="text-5xl font-bold text-white">
+                      <p className="text-5xl font-bold text-black">
                         {formatCurrency(
                           splitRevenue && typeof getTodayRevenue() === "object"
                             ? (getTodayRevenue() as any).interviewCoder
@@ -449,7 +407,7 @@ export default function RevenueDashboard() {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-7xl font-bold text-white">
+                  <p className="text-7xl font-bold text-black">
                     {formatCurrency(
                       !splitRevenue && typeof getTodayRevenue() === "number"
                         ? (getTodayRevenue() as number)
@@ -463,26 +421,26 @@ export default function RevenueDashboard() {
 
           {/* Large Chart - Extended to bottom */}
           <div className="w-full" style={{ height: "calc(100vh - 280px)" }}>
-            <div className="bg-black bg-opacity-40 backdrop-blur-sm rounded-xl p-6 border border-white border-opacity-20 h-full">
+            <div className="bg-white/50 backdrop-blur-sm border-2 border-gray-200 rounded-xl p-6 shadow-lg h-full">
               {initialLoading ? (
                 <div className="h-full flex items-center justify-center">
                   <div className="flex flex-col items-center gap-3">
-                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-white"></div>
-                    <p className="text-sm text-white opacity-80">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-black"></div>
+                    <p className="text-sm text-black opacity-80">
                       Loading chart...
                     </p>
                   </div>
                 </div>
               ) : error && !revenueData ? (
                 <div className="h-full flex items-center justify-center">
-                  <div className="text-red-400 text-center flex flex-col items-center gap-3">
+                  <div className="text-red-600 text-center flex flex-col items-center gap-3">
                     <AlertCircle className="h-8 w-8" />
                     <p className="text-sm">Chart error</p>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={handleRefresh}
-                      className="text-white hover:bg-white hover:bg-opacity-20"
+                      className="text-black hover:bg-black hover:bg-opacity-20"
                     >
                       Retry
                     </Button>
@@ -502,7 +460,7 @@ export default function RevenueDashboard() {
                     </>
                   ) : (
                     <div className="h-full flex items-center justify-center">
-                      <p className="text-white opacity-80">
+                      <p className="text-black opacity-80">
                         No chart data available
                       </p>
                     </div>

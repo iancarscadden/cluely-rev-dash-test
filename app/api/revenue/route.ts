@@ -110,13 +110,13 @@ export async function GET() {
     let historicalData: CombinedRevenueData[] = []
 
     try {
-      // Path to the CSV file - UPDATED to use the new June 6th comprehensive historical data
+      // Path to the CSV file - UPDATED to use the new June 14th comprehensive historical data
       const csvPath = path.join(
         process.cwd(),
         "app",
         "api",
         "revenue",
-        "revenue_data_jun6th.csv"
+        "revenue_data_jun14th.csv"
       )
       console.log(`API: Attempting to read CSV from ${csvPath}`)
 
@@ -449,7 +449,7 @@ async function fetchAllTransactionsImproved(
   stripeClient: Stripe,
   startTimestamp: number,
   endTimestamp?: number,
-  maxPages = 8, // Reduced back to 8 since we now only fetch 1 day of recent data
+  maxPages = 20, // CRITICAL FIX: Increased from 8 to 20 to capture all recent transactions and prevent missing revenue data
 ): Promise<Stripe.BalanceTransaction[]> {
   // Initialize an array to store all transactions
   const allTransactions: Stripe.BalanceTransaction[] = []
